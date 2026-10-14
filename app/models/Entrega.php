@@ -18,16 +18,22 @@ class Entrega {
         return $r ?: null;
     }
     public static function create(array $data): int {
-        $hp = $data['hallacas_pagadas'] ?? 0;
-        $status = 'pendiente';
-        if ($hp >= $data['hallacas_entregadas'] && $data['hallacas_entregadas'] > 0) $status = 'pagado';
-        elseif ($hp > 0) $status = 'parcial';
-        $montoPagado = (float)($data['monto_pagado'] ?? 0);
         DB::query('INSERT INTO entregas (jornada_id,mission_id,member_id,hallacas_entregadas,hallacas_pagadas,precio_unitario,monto_pagado,status,notes) VALUES (?,?,?,?,?,?,?,?,?)',
-            [$data['jornada_id'], $data['mission_id'], $data['member_id'], $data['hallacas_entregadas'], $hp, $data['precio_unitario'], $montoPagado, $status, $data['notes'] ?? null]);
+            [$data['jornada_id'], $data['mission_id'], $data['member_id'], $data['hallacas_entregadas'], 0, $data['precio_unitario'], 0, 'pendiente', $data['notes'] ?? null]);
         $id = (int)DB::connect()->lastInsertId();
+        $hp = (int)($data['hallacas_pagadas'] ?? 0);
+        $montoPagado = (float)($data['monto_pagado'] ?? 0);
         if ($hp > 0 || $montoPagado > 0) {
-            Pago::create(['entrega_id'=>$id,'hallacas'=>$hp,'monto'=>$montoPagado,'metodo'=>$data['metodo'] ?? 'inicial','notes'=>'Entrega inicial','created_by'=>$data['created_by'] ?? null]);
+            Pago::create([
+                'entrega_id'=>$id,
+                'hallacas'=>$hp,
+                'monto'=>$montoPagado,
+                'moneda'=>$data['moneda'] ?? 'VES',
+                'metodo'=>$data['metodo'] ?? 'inicial',
+                'status'=>'pendiente',
+                'notes'=>'Entrega inicial',
+                'created_by'=>$data['created_by'] ?? null
+            ]);
         }
         return $id;
     }
@@ -46,13 +52,25 @@ class Entrega {
             Pago::create(['entrega_id'=>$id,'hallacas'=>$deltaH,'monto'=>$deltaM,'metodo'=>$metodo ?: 'abono','notes'=>$notes,'created_by'=>$userId]);
         }
     }
-    public static function registrarAbono(int $entregaId, int $hallacas, float $monto, string $metodo, ?string $notes, ?int $userId): void {
+    public static function registrarAbono(int $entregaId, int $hallacas, float $monto, string $metodo, ?string $notes, ?int $userId, string $moneda = 'VES'): void {
         $e = self::find($entregaId);
         if (!$e) return;
-        $newHp = (int)$e['hallacas_pagadas'] + $hallacas;
-        if ($newHp > (int)$e['hallacas_entregadas']) $newHp = (int)$e['hallacas_entregadas'];
-        $newMonto = (float)$e['monto_pagado'] + $monto;
-        self::updatePago($entregaId, $newHp, $newMonto, $metodo, $notes, $userId);
+        $hp = $hallacas;
+        if ($hp < 0) $hp = 0;
+        if ($hp > ((int)$e['hallacas_entregadas'] - (int)$e['hallacas_pagadas'])) {
+            $hp = (int)$e['hallacas_entregadas'] - (int)$e['hallacas_pagadas'];
+        }
+        if ($hp <= 0 && $monto <= 0) return;
+        Pago::create([
+            'entrega_id'=>$entregaId,
+            'hallacas'=>$hp,
+            'monto'=>$monto,
+            'moneda'=>$moneda,
+            'metodo'=>$metodo,
+            'status'=>'pendiente',
+            'notes'=>$notes,
+            'created_by'=>$userId
+        ]);
     }
     public static function delete(int $id): void { DB::query('DELETE FROM entregas WHERE id=?', [$id]); }
 }

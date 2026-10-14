@@ -22,6 +22,25 @@ class PaymentController {
             $params
         )->fetchAll();
 
+        // pagos pendientes por confirmar (admin confirma)
+        $whereP = 'WHERE p.status="pendiente"';
+        $paramsP = [];
+        if ($jornadaId) { $whereP .= ' AND e.jornada_id = ?'; $paramsP[] = $jornadaId; }
+        if ($missionId) { $whereP .= ' AND e.mission_id = ?'; $paramsP[] = $missionId; }
+        if (!Auth::isAdmin()) { $whereP .= ' AND e.mission_id = ?'; $paramsP[] = Auth::missionId(); }
+        $pagosPendientes = DB::query(
+            "SELECT p.*, e.id AS entrega_id, u.name AS member_name, m.name AS mission_name, j.name AS jornada_name, j.fecha, uc.name AS creado_por
+             FROM pagos p
+             JOIN entregas e ON e.id=p.entrega_id
+             JOIN users u ON u.id=e.member_id
+             JOIN missions m ON m.id=e.mission_id
+             JOIN jornadas j ON j.id=e.jornada_id
+             LEFT JOIN users uc ON uc.id=p.created_by
+             $whereP
+             ORDER BY p.fecha ASC",
+            $paramsP
+        )->fetchAll();
+
         // recent payments
         $w2 = 'WHERE 1=1';
         $p2 = [];
@@ -46,4 +65,17 @@ class PaymentController {
         $missions = Mission::all(true);
         include BASE_PATH . '/app/views/payments/index.php';
     }
+
+    public static function confirm(): void {
+        require_role('admin');
+        if (!csrf_verify()) { flash('error','CSRF inválido'); redirect('payments'); }
+        $id = (int)($_POST['pago_id'] ?? 0);
+        if (Pago::confirmar($id, (int)Auth::user()['id'])) {
+            flash('success','Pago confirmado y aplicado a la entrega');
+        } else {
+            flash('error','No se pudo confirmar el pago');
+        }
+        redirect('payments');
+    }
+
 }

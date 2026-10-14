@@ -111,6 +111,9 @@ switch ($route) {
     case 'payments':
         PaymentController::index();
         break;
+    case 'payment_confirm':
+        PaymentController::confirm();
+        break;
     case 'reports':
         ReportController::index();
         break;

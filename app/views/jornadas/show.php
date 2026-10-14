@@ -99,7 +99,13 @@ foreach (Mission::all() as $m) $missionById[$m['id']] = $m;
                 <div class="row g-2">
                   <div class="col"><input type="number" name="hallacas" class="form-control form-control-sm" placeholder="+ hallacas pagadas" min="0" value="0"></div>
                   <div class="col"><input type="number" step="0.01" name="monto" class="form-control form-control-sm" placeholder="monto" value="0"></div>
-                  <div class="col"><input name="metodo" class="form-control form-control-sm" placeholder="método"></div>
+                  <div class="col">
+ <select name="metodo" class="form-select form-select-sm">
+   <option value="pago_movil">Pago móvil</option>
+   <option value="efectivo_ves">Efectivo Bs</option>
+   <option value="efectivo_usd">Efectivo USD</option>
+ </select>
+</div>
                   <div class="col"><input name="notes" class="form-control form-control-sm" placeholder="notas"></div>
                   <div class="col-auto"><button class="btn btn-sm btn-primary">Guardar abono</button></div>
                 </div>

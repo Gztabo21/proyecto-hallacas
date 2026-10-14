@@ -90,12 +90,17 @@ CREATE TABLE IF NOT EXISTS pagos (
   entrega_id INT NOT NULL,
   hallacas INT NOT NULL DEFAULT 0,
   monto DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  moneda ENUM('USD','VES') NOT NULL DEFAULT 'VES',
   metodo VARCHAR(60) NULL,
+  status ENUM('pendiente','confirmado') NOT NULL DEFAULT 'pendiente',
   fecha DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  confirmado_at DATETIME NULL,
   notes TEXT NULL,
   created_by INT NULL,
+  confirmado_por INT NULL,
   FOREIGN KEY (entrega_id) REFERENCES entregas(id) ON DELETE CASCADE,
-  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (confirmado_por) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- Seed

@@ -8,7 +8,8 @@ Sistema web para controlar la distribución de hallacas por jornadas y misiones.
 - Jornadas de distribución con precio por hallaca.
 - Asignación de hallacas a cada misión por jornada.
 - Distribución a miembros del equipo por el coordinador.
-- Registro de pagos (totales o parciales) y hallacas pendientes por cancelar.
+- Registro de pagos por pago móvil, efectivo bolívares y efectivo dólares, con estado pendiente por confirmar/confirmado (confirmación por administrador).
+- Dashboard para coordinador: canceladas vs pendientes.
 - Reportes por misión, jornada y miembro.
 - Control de acceso por roles.
 

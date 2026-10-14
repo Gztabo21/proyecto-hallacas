@@ -29,6 +29,43 @@
   </div>
 </form>
 
+<?php if (Auth::isAdmin()): ?>
+<h5>Pagos pendientes por confirmar</h5>
+<?php if (empty($pagosPendientes)): ?>
+<div class="alert alert-secondary">No hay pagos pendientes de confirmación.</div>
+<?php else: ?>
+<div class="table-responsive">
+<table class="table table-striped table-sm align-middle">
+ <thead><tr><th>Fecha</th><th>Jornada</th><th>Misión</th><th>Miembro</th><th>Hallacas</th><th>Monto</th><th>Moneda</th><th>Método</th><th>Registrado por</th><th>Conf.</th></tr></thead>
+ <tbody>
+ <?php foreach ($pagosPendientes as $pp): ?>
+ <tr>
+   <td><?= h($pp['fecha']) ?></td>
+   <td><?= h($pp['jornada_name']) ?></td>
+   <td><?= h($pp['mission_name']) ?></td>
+   <td><?= h($pp['member_name']) ?></td>
+   <td><?= (int)$pp['hallacas'] ?></td>
+   <td><?= money($pp['monto']) ?></td>
+   <td><?= h($pp['moneda']) ?></td>
+   <td><?= h($pp['metodo']) ?></td>
+   <td><?= h($pp['creado_por'] ?? '-') ?></td>
+   <td>
+     <form method="post" action="<?= url('payment_confirm') ?>" class="d-inline">
+       <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
+       <input type="hidden" name="pago_id" value="<?= (int)$pp['id'] ?>">
+       <button class="btn btn-sm btn-primary">Confirmar</button>
+     </form>
+   </td>
+ </tr>
+ <?php endforeach; ?>
+ </tbody>
+</table>
+</div>
+<?php endif; ?>
+<?php else: ?>
+<div class="alert alert-info">Tus pagos registrados quedan <strong>pendientes por confirmar</strong> hasta que el administrador los valide.</div>
+<?php endif; ?>
+
 <h5>Pendientes por cancelar</h5>
 <?php if (empty($pendientes)): ?>
 <div class="alert alert-info">No hay hallacas pendientes por cancelar con los filtros actuales.</div>
@@ -59,7 +96,13 @@
        <input type="hidden" name="entrega_id" value="<?= (int)$e['id'] ?>">
        <div class="col-12 col-md-3"><input type="number" name="hallacas" class="form-control form-control-sm" min="0" max="<?= $pend ?>" value="0" placeholder="+ hall"></div>
        <div class="col-12 col-md-3"><input type="number" step="0.01" name="monto" class="form-control form-control-sm" value="0" placeholder="monto"></div>
-       <div class="col-12 col-md-2"><input name="metodo" class="form-control form-control-sm" placeholder="método"></div>
+       <div class="col-12 col-md-2">
+         <select name="metodo" class="form-select form-select-sm">
+           <option value="pago_movil">Pago móvil</option>
+           <option value="efectivo_ves">Efectivo Bs</option>
+           <option value="efectivo_usd">Efectivo USD</option>
+         </select>
+       </div>
        <div class="col-12 col-md-2"><input name="notes" class="form-control form-control-sm" placeholder="notas"></div>
        <div class="col-12 col-md-2"><button class="btn btn-sm btn-success w-100">Pagar</button></div>
      </form>
@@ -77,7 +120,7 @@
 <?php else: ?>
 <div class="table-responsive">
 <table class="table table-striped table-sm">
- <thead><tr><th>Fecha</th><th>Jornada</th><th>Misión</th><th>Miembro</th><th>Hallacas</th><th>Monto</th><th>Método</th><th>Registrado por</th><th>Notas</th></tr></thead>
+ <thead><tr><th>Fecha</th><th>Jornada</th><th>Misión</th><th>Miembro</th><th>Hallacas</th><th>Monto</th><th>Moneda</th><th>Método</th><th>Estado</th><th>Registrado por</th><th>Notas</th></tr></thead>
  <tbody>
  <?php foreach ($recientes as $p): ?>
  <tr>
@@ -87,7 +130,9 @@
    <td><?= h($p['member_name']) ?></td>
    <td><?= (int)$p['hallacas'] ?></td>
    <td><?= money($p['monto']) ?></td>
+   <td><?= h($p['moneda']) ?></td>
    <td><?= h($p['metodo']) ?></td>
+   <td><?= status_badge($p['status']) ?></td>
    <td><?= h($p['creado_por'] ?? '-') ?></td>
    <td><?= h($p['notes']) ?></td>
  </tr>

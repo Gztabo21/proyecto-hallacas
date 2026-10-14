@@ -60,7 +60,10 @@ class DistributionController {
         $monto = (float)($_POST['monto'] ?? 0);
         $restantes = (int)$e['hallacas_entregadas'] - (int)$e['hallacas_pagadas'];
         if ($hall > $restantes) $hall = $restantes;
-        Entrega::registrarAbono($eid, $hall, $monto, $_POST['metodo'] ?? 'abono', trim($_POST['notes'] ?? ''), Auth::user()['id']);
+                $metodo = $_POST['metodo'] ?? 'pago_movil';
+        $moneda = 'VES';
+        if ($metodo === 'efectivo_usd') $moneda = 'USD';
+        Entrega::registrarAbono($eid, $hall, $monto, $metodo, trim($_POST['notes'] ?? ''), Auth::user()['id'], $moneda);
         flash('success','Abono registrado');
         redirect('jornada_show', ['id'=>$e['jornada_id']]);
     }
