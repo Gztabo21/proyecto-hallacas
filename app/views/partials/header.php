@@ -19,6 +19,7 @@
         <li class="nav-item"><a class="nav-link" href="<?= url('missions') ?>">Misiones</a></li>
         <li class="nav-item"><a class="nav-link" href="<?= url('users') ?>">Usuarios</a></li>
         <li class="nav-item"><a class="nav-link" href="<?= url('jornadas') ?>">Jornadas</a></li>
+        <li class="nav-item"><a class="nav-link" href="<?= url('payments') ?>">Pagos</a></li>
         <li class="nav-item"><a class="nav-link" href="<?= url('reports') ?>">Reportes</a></li>
         <?php endif; ?>
       </ul>

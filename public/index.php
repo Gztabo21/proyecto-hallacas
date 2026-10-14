@@ -9,6 +9,7 @@ require_once __DIR__ . '/../app/controllers/UserController.php';
 require_once __DIR__ . '/../app/controllers/JornadaController.php';
 require_once __DIR__ . '/../app/controllers/DistributionController.php';
 require_once __DIR__ . '/../app/controllers/ReportController.php';
+require_once __DIR__ . '/../app/controllers/PaymentController.php';
 
 $route = $_GET['r'] ?? '';
 
@@ -106,6 +107,9 @@ switch ($route) {
         break;
     case 'entrega_delete':
         DistributionController::deleteEntrega();
+        break;
+    case 'payments':
+        PaymentController::index();
         break;
     case 'reports':
         ReportController::index();
