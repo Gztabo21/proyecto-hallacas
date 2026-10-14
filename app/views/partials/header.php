@@ -16,22 +16,30 @@
       <ul class="navbar-nav me-auto">
         <?php if (Auth::check()): ?>
         <li class="nav-item"><a class="nav-link" href="<?= url('dashboard') ?>">Dashboard</a></li>
+        <?php if (in_array(Auth::role(), ['admin','coordinator'], true)): ?>
+        <li class="nav-item"><a class="nav-link" href="<?= url('jornadas') ?>">Jornadas</a></li>
+        <?php endif; ?>
+        <?php if (Auth::isAdmin()): ?>
         <li class="nav-item"><a class="nav-link" href="<?= url('missions') ?>">Misiones</a></li>
         <li class="nav-item"><a class="nav-link" href="<?= url('users') ?>">Usuarios</a></li>
-        <li class="nav-item"><a class="nav-link" href="<?= url('jornadas') ?>">Jornadas</a></li>
+        <?php endif; ?>
+        <?php if (in_array(Auth::role(), ['admin','coordinator'], true)): ?>
         <li class="nav-item"><a class="nav-link" href="<?= url('payments') ?>">Pagos</a></li>
         <li class="nav-item"><a class="nav-link" href="<?= url('reports') ?>">Reportes</a></li>
+        <?php endif; ?>
+        <?php else: ?>
+        <li class="nav-item"><a class="nav-link" href="<?= url('login') ?>">Ingresar</a></li>
         <?php endif; ?>
       </ul>
       <ul class="navbar-nav">
         <?php if (Auth::check()): ?>
-        <li class="nav-item"><span class="nav-link text-light"><?= h(Auth::user()['name']) ?> (<?= h(Auth::role()) ?>)</span></li>
+        <li class="nav-item"><span class="nav-link text-light small"><?= h(Auth::user()['name']) ?> · <?= h(Auth::role()) ?></span></li>
         <li class="nav-item"><a class="nav-link" href="<?= url('logout') ?>">Salir</a></li>
         <?php endif; ?>
       </ul>
     </div>
   </div>
 </nav>
-<div class="container-fluid mt-3">
+<div class="container-fluid px-2 px-md-3 mt-3">
 <?php if ($m = flash('success')): ?><div class="alert alert-success alert-dismissible fade show" role="alert"><?= h($m) ?><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div><?php endif; ?>
 <?php if ($m = flash('error')): ?><div class="alert alert-danger alert-dismissible fade show" role="alert"><?= h($m) ?><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div><?php endif; ?>
