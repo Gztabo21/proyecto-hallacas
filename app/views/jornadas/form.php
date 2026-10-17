@@ -19,10 +19,16 @@ $isEdit = (bool)$j;
     <input type="number" step="0.01" name="precio_hallaca" class="form-control" value="<?= h($j['precio_hallaca'] ?? setting('precio_hallaca', DEFAULT_PRICE)) ?>">
   </div>
   <div class="mb-3">
+    <label class="form-label">Total hallacas hechas (producción del día)</label>
+    <input type="number" name="total_hallacas_hechas" class="form-control" min="0" placeholder="Opcional"
+           value="<?= isset($j['total_hallacas_hechas']) && $j['total_hallacas_hechas'] !== null && $j['total_hallacas_hechas'] !== '' ? (int)$j['total_hallacas_hechas'] : '' ?>">
+    <div class="form-text">Cantidad total producida en la jornada; se compara con lo asignado a misiones.</div>
+  </div>
+  <div class="mb-3">
     <label class="form-label">Notas</label>
     <textarea name="notes" class="form-control"><?= h($j['notes'] ?? '') ?></textarea>
   </div>
-  <div class="d-flex gap-2">
+  <div class="d-flex flex-column flex-sm-row gap-2">
     <button class="btn btn-primary"><?= $isEdit ? 'Guardar' : 'Crear' ?></button>
     <a class="btn btn-secondary" href="<?= url('jornadas') ?>">Cancelar</a>
   </div>

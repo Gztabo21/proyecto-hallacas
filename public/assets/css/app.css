@@ -11,9 +11,11 @@ body { background:#f5f7fa; font-size:1rem; }
 .table { font-size:.9rem; }
 .table-responsive { -webkit-overflow-scrolling:touch; }
 
-/* tables become cards on very small screens */
+/* Responsive buttons and tables on very small screens */
 @media (max-width: 575.98px) {
   .table-sm th, .table-sm td { padding:.35rem .45rem; }
+  .table .btn { white-space:nowrap; font-size:.8rem; padding:.25rem .45rem; }
+  .card .card-body { padding:.75rem; }
   h2 { font-size:1.35rem; }
   h5 { font-size:1.05rem; }
 }
@@ -21,4 +23,41 @@ body { background:#f5f7fa; font-size:1rem; }
 @media (min-width: 768px) {
   body { font-size:1.02rem; }
   .table { font-size:.95rem; }
+}
+
+/* Login */
+.login-page {
+  background: linear-gradient(165deg, #e8f0fe 0%, #f5f7fa 45%, #f0f4f8 100%);
+}
+.login-top {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+.login-brand {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #1a1a2e;
+  letter-spacing: 0.02em;
+}
+.login-card {
+  border-radius: 1rem !important;
+  box-shadow: 0 8px 32px rgba(13, 110, 253, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+}
+.login-card-title {
+  font-weight: 600;
+  color: #1a1a2e;
+}
+.login-footer {
+  background: rgba(255, 255, 255, 0.9);
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+.login-footer-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #495057;
+}
+.login-footer-text {
+  font-size: 0.8rem;
+  color: #868e96;
 }

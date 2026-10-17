@@ -24,7 +24,7 @@ $isEdit = (bool)$u;
     <div class="col-md-6 mb-3">
       <label class="form-label">Rol</label>
       <select name="role" class="form-select">
-        <?php foreach (['admin','coordinator','member'] as $r): ?>
+        <?php foreach (['admin','coordinator','jornada_admin','member'] as $r): ?>
         <option value="<?= $r ?>" <?= (($u['role'] ?? 'member')===$r)?'selected':'' ?>><?= $r ?></option>
         <?php endforeach; ?>
       </select>
@@ -52,7 +52,18 @@ $isEdit = (bool)$u;
       </select>
     </div>
   </div>
-  <div class="d-flex gap-2">
+  <div class="row">
+    <div class="col-md-6 mb-3">
+      <label class="form-label">Jornada asignada (admin de jornada)</label>
+      <select name="jornada_ids[]" class="form-select" multiple size="5">
+        <?php foreach (($jornadas ?? (class_exists('Jornada') ? Jornada::all() : [])) as $j): ?>
+        <option value="<?= (int)$j['id'] ?>" <?= in_array((int)$j['id'], $userJornadaIds ?? [], true)?'selected':'' ?>><?= h($j['name']) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <div class="form-text">Mantén Ctrl/Cmd para seleccionar varias jornadas (para administrador de jornada).</div>
+    </div>
+  </div>
+  <div class="d-flex flex-column flex-sm-row gap-2">
     <button class="btn btn-primary"><?= $isEdit ? 'Guardar' : 'Crear' ?></button>
     <a class="btn btn-secondary" href="<?= url('users') ?>">Cancelar</a>
   </div>

@@ -34,7 +34,7 @@ $isEdit = (bool)$m;
       <option value="inactive" <?= (($m['status'] ?? '')==='inactive')?'selected':'' ?>>Inactiva</option>
     </select>
   </div>
-  <div class="d-flex gap-2">
+  <div class="d-flex flex-column flex-sm-row gap-2">
     <button class="btn btn-primary"><?= $isEdit ? 'Guardar' : 'Crear' ?></button>
     <a class="btn btn-secondary" href="<?= url('missions') ?>">Cancelar</a>
   </div>

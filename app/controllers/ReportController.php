@@ -23,7 +23,7 @@ class ReportController {
             $sql .= ' AND jm.mission_id=?';
             $p[] = Auth::missionId();
         }
-        $sql .= ' GROUP BY jm.jornada_id, jm.mission_id ORDER BY j.fecha DESC, m.name';
+        $sql .= ' GROUP BY jm.jornada_id, jm.mission_id, j.name, j.fecha, m.name, jm.hallacas_asignadas ORDER BY j.fecha DESC, m.name';
         $porMision = DB::query($sql, $p)->fetchAll();
 
         // By member
@@ -40,7 +40,7 @@ class ReportController {
         if ($jornadaId) { $sql2 .= ' AND e.jornada_id=?'; $p2[] = $jornadaId; }
         if ($missionId) { $sql2 .= ' AND e.mission_id=?'; $p2[] = $missionId; }
         if (!Auth::isAdmin()) { $sql2 .= ' AND e.mission_id=?'; $p2[] = Auth::missionId(); }
-        $sql2 .= ' GROUP BY e.member_id ORDER BY u.name';
+        $sql2 .= ' GROUP BY e.member_id, e.mission_id, u.name, m.name ORDER BY u.name';
         $porMiembro = DB::query($sql2, $p2)->fetchAll();
 
         $jornadas = Jornada::all();

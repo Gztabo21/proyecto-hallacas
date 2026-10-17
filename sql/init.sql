@@ -28,13 +28,15 @@ CREATE TABLE IF NOT EXISTS users (
   name VARCHAR(120) NOT NULL,
   email VARCHAR(190) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
-  role ENUM('admin','coordinator','member') NOT NULL DEFAULT 'member',
+  role ENUM('admin','coordinator','jornada_admin','member') NOT NULL DEFAULT 'member',
   mission_id INT NULL,
+  jornada_id INT NULL,
   phone VARCHAR(40) NULL,
   status ENUM('active','inactive') NOT NULL DEFAULT 'active',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (mission_id) REFERENCES missions(id) ON DELETE SET NULL
+  FOREIGN KEY (mission_id) REFERENCES missions(id) ON DELETE SET NULL,
+  FOREIGN KEY (jornada_id) REFERENCES jornadas(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 ALTER TABLE missions
@@ -46,6 +48,7 @@ CREATE TABLE IF NOT EXISTS jornadas (
   name VARCHAR(120) NOT NULL,
   fecha DATE NOT NULL,
   precio_hallaca DECIMAL(10,2) NOT NULL DEFAULT 1.00,
+  total_hallacas_hechas INT NULL DEFAULT NULL,
   status ENUM('open','closed') NOT NULL DEFAULT 'open',
   notes TEXT NULL,
   created_by INT NULL,
@@ -92,6 +95,8 @@ CREATE TABLE IF NOT EXISTS pagos (
   monto DECIMAL(12,2) NOT NULL DEFAULT 0.00,
   moneda ENUM('USD','VES') NOT NULL DEFAULT 'VES',
   metodo VARCHAR(60) NULL,
+  tasa DECIMAL(12,4) NULL,
+  captura LONGTEXT NULL,
   status ENUM('pendiente','confirmado') NOT NULL DEFAULT 'pendiente',
   fecha DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   confirmado_at DATETIME NULL,
@@ -101,6 +106,14 @@ CREATE TABLE IF NOT EXISTS pagos (
   FOREIGN KEY (entrega_id) REFERENCES entregas(id) ON DELETE CASCADE,
   FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
   FOREIGN KEY (confirmado_por) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS user_jornada (
+  user_id INT NOT NULL,
+  jornada_id INT NOT NULL,
+  PRIMARY KEY (user_id, jornada_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (jornada_id) REFERENCES jornadas(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 -- Seed

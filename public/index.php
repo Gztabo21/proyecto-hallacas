@@ -6,6 +6,7 @@ require_once __DIR__ . '/../app/controllers/AuthController.php';
 require_once __DIR__ . '/../app/controllers/DashboardController.php';
 require_once __DIR__ . '/../app/controllers/MissionController.php';
 require_once __DIR__ . '/../app/controllers/UserController.php';
+require_once __DIR__ . '/../app/controllers/CoordinatorController.php';
 require_once __DIR__ . '/../app/controllers/JornadaController.php';
 require_once __DIR__ . '/../app/controllers/DistributionController.php';
 require_once __DIR__ . '/../app/controllers/ReportController.php';
@@ -66,6 +67,15 @@ switch ($route) {
     case 'user_delete':
         UserController::delete();
         break;
+    case 'coordinators':
+        CoordinatorController::index();
+        break;
+    case 'coordinator_create':
+        CoordinatorController::create();
+        break;
+    case 'coordinator_store':
+        CoordinatorController::store();
+        break;
     case 'jornadas':
         JornadaController::index();
         break;
@@ -96,6 +106,9 @@ switch ($route) {
     case 'jornada_asignar':
         JornadaController::asignar();
         break;
+    case 'jornada_total_hechas':
+        JornadaController::updateTotalHechas();
+        break;
     case 'jornada_quitar':
         JornadaController::quitar();
         break;
@@ -110,6 +123,9 @@ switch ($route) {
         break;
     case 'payments':
         PaymentController::index();
+        break;
+    case 'payment_method_store':
+        PaymentController::storeMethod();
         break;
     case 'payment_confirm':
         PaymentController::confirm();

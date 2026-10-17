@@ -2,13 +2,15 @@
 class Pago {
     public static function create(array $data): int {
         DB::query(
-            'INSERT INTO pagos (entrega_id,hallacas,monto,moneda,metodo,status,notes,created_by) VALUES (?,?,?,?,?,?,?,?)',
+            'INSERT INTO pagos (entrega_id,hallacas,monto,moneda,metodo,tasa,captura,status,notes,created_by) VALUES (?,?,?,?,?,?,?,?,?,?)',
             [
                 $data['entrega_id'],
                 $data['hallacas'] ?? 0,
                 $data['monto'] ?? 0,
                 $data['moneda'] ?? 'VES',
                 $data['metodo'] ?? null,
+                isset($data['tasa']) && $data['tasa'] !== '' ? (float)$data['tasa'] : null,
+                $data['captura'] ?? null,
                 $data['status'] ?? 'pendiente',
                 $data['notes'] ?? null,
                 $data['created_by'] ?? null

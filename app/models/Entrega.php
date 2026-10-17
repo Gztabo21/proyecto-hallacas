@@ -52,7 +52,7 @@ class Entrega {
             Pago::create(['entrega_id'=>$id,'hallacas'=>$deltaH,'monto'=>$deltaM,'metodo'=>$metodo ?: 'abono','notes'=>$notes,'created_by'=>$userId]);
         }
     }
-    public static function registrarAbono(int $entregaId, int $hallacas, float $monto, string $metodo, ?string $notes, ?int $userId, string $moneda = 'VES'): void {
+    public static function registrarAbono(int $entregaId, int $hallacas, float $monto, string $metodo, ?string $notes, ?int $userId, string $moneda = 'VES', ?float $tasa = null, ?string $captura = null): void {
         $e = self::find($entregaId);
         if (!$e) return;
         $hp = $hallacas;
@@ -67,6 +67,8 @@ class Entrega {
             'monto'=>$monto,
             'moneda'=>$moneda,
             'metodo'=>$metodo,
+            'tasa'=>$tasa,
+            'captura'=>$captura,
             'status'=>'pendiente',
             'notes'=>$notes,
             'created_by'=>$userId

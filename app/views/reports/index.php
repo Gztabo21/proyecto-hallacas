@@ -48,6 +48,20 @@
  </tr>
  <?php endforeach; ?>
  </tbody>
+ <tfoot class="table-light fw-bold">
+ <?php
+   $t_asig = $t_ent = $t_pag = $t_pend = 0; $t_monto = 0;
+   foreach ($porMision as $r) { $t_asig += (int)$r['hallacas_asignadas']; $t_ent += (int)$r['entregadas']; $t_pag += (int)$r['pagadas']; $t_pend += (int)$r['entregadas']-(int)$r['pagadas']; $t_monto += (float)$r['monto_pagado']; }
+ ?>
+ <tr>
+   <td colspan="3">Totales</td>
+   <td><?= $t_asig ?></td>
+   <td><?= $t_ent ?></td>
+   <td><?= $t_pag ?></td>
+   <td><?= $t_pend ?></td>
+   <td><?= money($t_monto) ?></td>
+ </tr>
+ </tfoot>
 </table>
 </div>
 
@@ -68,6 +82,20 @@
  </tr>
  <?php endforeach; ?>
  </tbody>
+ <tfoot class="table-light fw-bold">
+ <?php
+   $t_jor = $t_ent2 = $t_pag2 = $t_pend2 = 0; $t_monto2 = 0;
+   foreach ($porMiembro as $r) { $t_jor += (int)$r['jornadas']; $t_ent2 += (int)$r['entregadas']; $t_pag2 += (int)$r['pagadas']; $t_pend2 += (int)$r['entregadas']-(int)$r['pagadas']; $t_monto2 += (float)$r['monto_pagado']; }
+ ?>
+ <tr>
+   <td colspan="2">Totales</td>
+   <td><?= $t_jor ?></td>
+   <td><?= $t_ent2 ?></td>
+   <td><?= $t_pag2 ?></td>
+   <td><?= $t_pend2 ?></td>
+   <td><?= money($t_monto2) ?></td>
+ </tr>
+ </tfoot>
 </table>
 </div>
 <?php include BASE_PATH . '/app/views/partials/footer.php'; ?>

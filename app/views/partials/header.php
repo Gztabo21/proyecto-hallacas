@@ -16,12 +16,13 @@
       <ul class="navbar-nav me-auto">
         <?php if (Auth::check()): ?>
         <li class="nav-item"><a class="nav-link" href="<?= url('dashboard') ?>">Dashboard</a></li>
-        <?php if (in_array(Auth::role(), ['admin','coordinator'], true)): ?>
+        <?php if (in_array(Auth::role(), ['admin','coordinator','jornada_admin'], true)): ?>
         <li class="nav-item"><a class="nav-link" href="<?= url('jornadas') ?>">Jornadas</a></li>
         <?php endif; ?>
         <?php if (Auth::isAdmin()): ?>
         <li class="nav-item"><a class="nav-link" href="<?= url('missions') ?>">Misiones</a></li>
         <li class="nav-item"><a class="nav-link" href="<?= url('users') ?>">Usuarios</a></li>
+        <li class="nav-item"><a class="nav-link" href="<?= url('coordinators') ?>">Coordinadores</a></li>
         <?php endif; ?>
         <?php if (in_array(Auth::role(), ['admin','coordinator'], true)): ?>
         <li class="nav-item"><a class="nav-link" href="<?= url('payments') ?>">Pagos</a></li>

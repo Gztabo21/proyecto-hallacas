@@ -1,5 +1,5 @@
 <?php include BASE_PATH . '/app/views/partials/header.php'; ?>
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center gap-2 mb-3">
  <h2>Usuarios</h2>
  <a class="btn btn-primary" href="<?= url('user_create') ?>">Nuevo usuario</a>
 </div>

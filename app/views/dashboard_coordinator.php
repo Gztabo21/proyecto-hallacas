@@ -13,7 +13,7 @@
   <div class="col-md-4"><div class="card shadow-sm"><div class="card-body"><h6>Pendiente por cobrar</h6><h3><?= money($pendMoney) ?></h3></div></div></div>
 </div>
 
-<div class="d-flex gap-2 mb-3">
+<div class="d-flex flex-column flex-sm-row gap-2 mb-3">
   <a class="btn btn-primary" href="<?= url('jornadas') ?>">Jornadas y distribución</a>
   <a class="btn btn-success" href="<?= url('payments') ?>">Registrar pagos</a>
 </div>
@@ -39,6 +39,14 @@
  </tbody>
 </table>
 </div>
+<?= pagination_render(
+    $pagination['pagos']['total'],
+    $pagination['pagos']['page'],
+    $pagination['pagos']['per'],
+    'dashboard',
+    $pagination['pagos']['param'],
+    pagination_preserve($pagination['params'], $pagination['pagos']['param'])
+) ?>
 <?php endif; ?>
 
 <h5 class="mt-4">Mis entregas por miembro</h5>
@@ -61,6 +69,14 @@
  </tbody>
 </table>
 </div>
+<?= pagination_render(
+    $pagination['entregas']['total'],
+    $pagination['entregas']['page'],
+    $pagination['entregas']['per'],
+    'dashboard',
+    $pagination['entregas']['param'],
+    pagination_preserve($pagination['params'], $pagination['entregas']['param'])
+) ?>
 
 <h5 class="mt-4">Mis jornadas</h5>
 <div class="table-responsive">

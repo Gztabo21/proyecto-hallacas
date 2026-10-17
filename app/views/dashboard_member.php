@@ -1,8 +1,9 @@
 <?php include BASE_PATH . '/app/views/partials/header.php'; ?>
 <h2>Mi dashboard</h2>
 <?php
-$entregadas = 0; $pagadas=0; $pend=0; $monto=0;
-foreach ($entregas as $e){ $entregadas += (int)$e['hallacas_entregadas']; $pagadas += (int)$e['hallacas_pagadas']; $monto += (float)$e['monto_pagado']; }
+$entregadas = (int)($totals['entregadas'] ?? 0);
+$pagadas = (int)($totals['pagadas'] ?? 0);
+$monto = (float)($totals['monto'] ?? 0);
 $pend = $entregadas - $pagadas;
 ?>
 <div class="row mb-3">
@@ -30,4 +31,12 @@ $pend = $entregadas - $pagadas;
  </tbody>
 </table>
 </div>
+<?= pagination_render(
+    $pagination['entregas']['total'],
+    $pagination['entregas']['page'],
+    $pagination['entregas']['per'],
+    'dashboard',
+    $pagination['entregas']['param'],
+    pagination_preserve($pagination['params'], $pagination['entregas']['param'])
+) ?>
 <?php include BASE_PATH . '/app/views/partials/footer.php'; ?>
