@@ -35,13 +35,8 @@ CREATE TABLE IF NOT EXISTS users (
   status ENUM('active','inactive') NOT NULL DEFAULT 'active',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (mission_id) REFERENCES missions(id) ON DELETE SET NULL,
-  FOREIGN KEY (jornada_id) REFERENCES jornadas(id) ON DELETE SET NULL
+  FOREIGN KEY (mission_id) REFERENCES missions(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
-
-ALTER TABLE missions
-  ADD CONSTRAINT fk_missions_coordinator
-  FOREIGN KEY (coordinator_id) REFERENCES users(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS jornadas (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -56,6 +51,14 @@ CREATE TABLE IF NOT EXISTS jornadas (
   closed_at DATETIME NULL,
   FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
+
+ALTER TABLE users
+  ADD CONSTRAINT fk_users_jornada
+  FOREIGN KEY (jornada_id) REFERENCES jornadas(id) ON DELETE SET NULL;
+
+ALTER TABLE missions
+  ADD CONSTRAINT fk_missions_coordinator
+  FOREIGN KEY (coordinator_id) REFERENCES users(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS jornada_mision (
   id INT AUTO_INCREMENT PRIMARY KEY,
