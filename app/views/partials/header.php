@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?= h(APP_NAME) ?></title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/css/app.css">
+  <?php $cssPath = PUBLIC_PATH . '/assets/css/app.css'; $cssVer = is_file($cssPath) ? (string)filemtime($cssPath) : '1'; ?>
+  <link rel="stylesheet" href="<?= h(asset('assets/css/app.css')) ?>?v=<?= h($cssVer) ?>">
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
@@ -25,6 +26,7 @@
         <li class="nav-item"><a class="nav-link" href="<?= url('coordinators') ?>">Coordinadores</a></li>
         <?php endif; ?>
         <?php if (in_array(Auth::role(), ['admin','coordinator'], true)): ?>
+        <li class="nav-item"><a class="nav-link" href="<?= url('members') ?>">Miembros</a></li>
         <li class="nav-item"><a class="nav-link" href="<?= url('payments') ?>">Pagos</a></li>
         <li class="nav-item"><a class="nav-link" href="<?= url('reports') ?>">Reportes</a></li>
         <?php endif; ?>

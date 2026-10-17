@@ -1,6 +1,6 @@
 /* Mobile-first */
 :root { --brand:#0d6efd; }
-body { background:#f5f7fa; font-size:1rem; }
+body { background-color:#f5f7fa; font-size:1rem; }
 .container-fluid { padding-left:.75rem; padding-right:.75rem; }
 
 .card { border:0; border-radius:.85rem; box-shadow:0 2px 12px rgba(0,0,0,.06); }
@@ -25,13 +25,21 @@ body { background:#f5f7fa; font-size:1rem; }
   .table { font-size:.95rem; }
 }
 
-/* Login */
+/* Login — --login-bg-url se define en header_login.php */
 .login-page {
-  background: linear-gradient(165deg, #e8f0fe 0%, #f5f7fa 45%, #f0f4f8 100%);
+  min-height: 100vh;
+  background-color: #1e293b;
+  background-image:
+    linear-gradient(rgba(15, 23, 42, 0.62), rgba(15, 23, 42, 0.52)),
+    var(--login-bg-url, none);
+  background-position: center center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-attachment: scroll;
 }
 .login-top {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(6px);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 .login-brand {
@@ -42,15 +50,25 @@ body { background:#f5f7fa; font-size:1rem; }
 }
 .login-card {
   border-radius: 1rem !important;
-  box-shadow: 0 8px 32px rgba(13, 110, 253, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.08) !important;
 }
 .login-card-title {
   font-weight: 600;
   color: #1a1a2e;
 }
 .login-footer {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
   border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+.login-footer-credit {
+  font-size: 0.7rem;
+  color: #adb5bd;
+}
+.login-footer-credit a {
+  color: #868e96;
 }
 .login-footer-title {
   font-size: 0.875rem;

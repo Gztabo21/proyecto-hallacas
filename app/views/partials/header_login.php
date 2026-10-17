@@ -5,7 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Ingresar — <?= h(APP_NAME) ?></title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/css/app.css">
+  <?php
+    $cssPath = PUBLIC_PATH . '/assets/css/app.css';
+    $cssVer = is_file($cssPath) ? (string)filemtime($cssPath) : '1';
+    $bgPath = PUBLIC_PATH . '/assets/img/login-bg.jpg';
+    $bgVer = is_file($bgPath) ? (string)filemtime($bgPath) : '1';
+    $bgUrl = asset('assets/img/login-bg.jpg') . '?v=' . $bgVer;
+  ?>
+  <link rel="stylesheet" href="<?= h(asset('assets/css/app.css')) ?>?v=<?= h($cssVer) ?>">
+  <style>:root { --login-bg-url: url('<?= h($bgUrl) ?>'); }</style>
 </head>
 <body class="login-page d-flex flex-column min-vh-100">
 <header class="login-top py-3">

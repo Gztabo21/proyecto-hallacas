@@ -6,6 +6,7 @@ require_once __DIR__ . '/../app/controllers/AuthController.php';
 require_once __DIR__ . '/../app/controllers/DashboardController.php';
 require_once __DIR__ . '/../app/controllers/MissionController.php';
 require_once __DIR__ . '/../app/controllers/UserController.php';
+require_once __DIR__ . '/../app/controllers/MemberController.php';
 require_once __DIR__ . '/../app/controllers/CoordinatorController.php';
 require_once __DIR__ . '/../app/controllers/JornadaController.php';
 require_once __DIR__ . '/../app/controllers/DistributionController.php';
@@ -66,6 +67,21 @@ switch ($route) {
         break;
     case 'user_delete':
         UserController::delete();
+        break;
+    case 'members':
+        MemberController::index();
+        break;
+    case 'member_create':
+        MemberController::create();
+        break;
+    case 'member_store':
+        MemberController::store();
+        break;
+    case 'member_edit':
+        MemberController::edit();
+        break;
+    case 'member_update':
+        MemberController::update();
         break;
     case 'coordinators':
         CoordinatorController::index();

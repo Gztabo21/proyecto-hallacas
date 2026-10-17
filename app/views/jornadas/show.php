@@ -12,6 +12,7 @@ $totalEntregadasJornada = Jornada::totalEntregadas((int)$jornada['id']);
 $restPorAsignar = $totalHechas !== null ? $totalHechas - $totalAsignadasJornada : null;
 $cuadraProduccion = $totalHechas !== null && $totalAsignadasJornada === $totalHechas && $totalEntregadasJornada <= $totalAsignadasJornada;
 $sobreAsignado = $totalHechas !== null && $totalAsignadasJornada > $totalHechas;
+page_back('jornadas', 'Volver a jornadas');
 ?>
 <h2><?= h($jornada['name']) ?> <small class="text-muted">(<?= h($jornada['fecha']) ?>)</small> <?= status_badge($jornada['status']) ?></h2>
 <p>Precio por hallaca: <strong><?= money($precio) ?></strong> <?= $jornada['notes'] ? ' - '.h($jornada['notes']) : '' ?></p>

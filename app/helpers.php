@@ -1,4 +1,24 @@
 <?php
+/** Botón «Volver» consistente en formularios y vistas secundarias. */
+function page_back(string $route, string $label = 'Volver', array $params = []): void {
+    echo '<a href="' . h(url($route, $params)) . '" class="btn btn-outline-secondary btn-sm mb-3">&larr; ' . h($label) . '</a>';
+}
+
+function asset(string $path): string {
+    $path = ltrim($path, '/');
+    static $base = null;
+    if ($base === null) {
+        $script = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '/index.php');
+        $dir = dirname($script);
+        if ($dir === '/' || $dir === '.') {
+            $base = '';
+        } else {
+            $base = rtrim($dir, '/');
+        }
+    }
+    return ($base !== '' ? $base . '/' : '/') . $path;
+}
+
 function url(string $route = '', array $params = []): string {
     $q = array_merge(['r' => $route], $params);
     if ($route === '') unset($q['r']);

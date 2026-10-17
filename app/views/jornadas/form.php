@@ -1,6 +1,11 @@
 <?php include BASE_PATH . '/app/views/partials/header.php';
 $j = $jornada ?? null;
 $isEdit = (bool)$j;
+if ($isEdit) {
+    page_back('jornada_show', 'Volver a la jornada', ['id' => (int)$j['id']]);
+} else {
+    page_back('jornadas', 'Volver a jornadas');
+}
 ?>
 <h2><?= $isEdit ? 'Editar jornada' : 'Nueva jornada' ?></h2>
 <form method="post" action="<?= url($isEdit ? 'jornada_update' : 'jornada_store') ?>" class="card p-3 shadow-sm">
@@ -30,7 +35,7 @@ $isEdit = (bool)$j;
   </div>
   <div class="d-flex flex-column flex-sm-row gap-2">
     <button class="btn btn-primary"><?= $isEdit ? 'Guardar' : 'Crear' ?></button>
-    <a class="btn btn-secondary" href="<?= url('jornadas') ?>">Cancelar</a>
+    <a class="btn btn-outline-secondary" href="<?= url($isEdit ? 'jornada_show' : 'jornadas', $isEdit ? ['id' => (int)$j['id']] : []) ?>">Volver</a>
   </div>
 </form>
 <?php include BASE_PATH . '/app/views/partials/footer.php'; ?>

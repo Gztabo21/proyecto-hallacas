@@ -1,4 +1,6 @@
-<?php include BASE_PATH . '/app/views/partials/header.php'; ?>
+<?php include BASE_PATH . '/app/views/partials/header.php';
+page_back('dashboard', 'Volver al dashboard');
+?>
 <h2>Reportes</h2>
 <form method="get" action="<?= url('reports') ?>" class="card p-3 mb-3">
   <input type="hidden" name="r" value="reports">

@@ -1,4 +1,6 @@
-<?php include BASE_PATH . '/app/views/partials/header.php'; ?>
+<?php include BASE_PATH . '/app/views/partials/header.php';
+page_back('dashboard', 'Volver al dashboard');
+?>
 <h2>Registro de pagos</h2>
 <p class="text-muted">Abono por hallacas pendientes de cancelar.</p>
 <?php if (Auth::isAdmin()): ?>
@@ -68,101 +70,109 @@
   </div>
 </form>
 
-<?php if (Auth::isAdmin()): ?>
-<h5>Pagos pendientes por confirmar</h5>
-<?php if (empty($pagosPendientes)): ?>
-<div class="alert alert-secondary">No hay pagos pendientes de confirmación.</div>
-<?php else: ?>
-<div class="table-responsive">
-<table class="table table-striped table-sm align-middle">
- <thead><tr><th>Fecha</th><th>Jornada</th><th>Misión</th><th>Miembro</th><th>Hallacas</th><th>Monto</th><th>Moneda</th><th>Método</th><th>Registrado por</th><th>Conf.</th></tr></thead>
- <tbody>
- <?php foreach ($pagosPendientes as $pp): ?>
- <tr>
-   <td><?= h($pp['fecha']) ?></td>
-   <td><?= h($pp['jornada_name']) ?></td>
-   <td><?= h($pp['mission_name']) ?></td>
-   <td><?= h($pp['member_name']) ?></td>
-   <td><?= (int)$pp['hallacas'] ?></td>
-   <td><?= money($pp['monto']) ?></td>
-   <td><?= h($pp['moneda']) ?></td>
-   <td><?= h($pp['metodo']) ?></td>
-   <td><?= h($pp['creado_por'] ?? '-') ?></td>
-   <td>
-     <form method="post" action="<?= url('payment_confirm') ?>" class="d-inline">
-       <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
-       <input type="hidden" name="pago_id" value="<?= (int)$pp['id'] ?>">
-       <button class="btn btn-sm btn-primary">Confirmar</button>
-     </form>
-   </td>
- </tr>
- <?php endforeach; ?>
- </tbody>
-</table>
+<div class="row g-3 mb-3">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header py-2"><h5 class="mb-0">Pagos pendientes por confirmar</h5></div>
+      <div class="card-body p-0">
+        <?php if (Auth::isAdmin()): ?>
+          <?php if (empty($pagosPendientes)): ?>
+          <div class="alert alert-secondary m-3 mb-0">No hay pagos pendientes de confirmación.</div>
+          <?php else: ?>
+          <div class="table-responsive">
+          <table class="table table-striped table-sm align-middle mb-0">
+           <thead><tr><th>Fecha</th><th>Jornada</th><th>Misión</th><th>Miembro</th><th>Hall.</th><th>Monto</th><th>Mon.</th><th>Método</th><th>Conf.</th></tr></thead>
+           <tbody>
+           <?php foreach ($pagosPendientes as $pp): ?>
+           <tr>
+             <td><?= h($pp['fecha']) ?></td>
+             <td><?= h($pp['jornada_name']) ?></td>
+             <td><?= h($pp['mission_name']) ?></td>
+             <td><?= h($pp['member_name']) ?></td>
+             <td><?= (int)$pp['hallacas'] ?></td>
+             <td><?= money($pp['monto']) ?></td>
+             <td><?= h($pp['moneda']) ?></td>
+             <td><?= h($pp['metodo']) ?></td>
+             <td>
+               <form method="post" action="<?= url('payment_confirm') ?>" class="d-inline">
+                 <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
+                 <input type="hidden" name="pago_id" value="<?= (int)$pp['id'] ?>">
+                 <button class="btn btn-sm btn-primary">Confirmar</button>
+               </form>
+             </td>
+           </tr>
+           <?php endforeach; ?>
+           </tbody>
+          </table>
+          </div>
+          <?= pagination_render(
+              $pagination['confirmar']['total'],
+              $pagination['confirmar']['page'],
+              $pagination['confirmar']['per'],
+              'payments',
+              $pagination['confirmar']['param'],
+              array_merge($pagination['filters'], pagination_preserve($pagination['params'], $pagination['confirmar']['param']))
+          ) ?>
+          <?php endif; ?>
+        <?php else: ?>
+        <div class="alert alert-info m-3 mb-0">Tus pagos registrados quedan <strong>pendientes por confirmar</strong> hasta que el administrador los valide.</div>
+        <?php endif; ?>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header py-2"><h5 class="mb-0">Pendientes por cancelar</h5></div>
+      <div class="card-body p-0">
+        <?php if (empty($pendientes)): ?>
+        <div class="alert alert-info m-3 mb-0">No hay hallacas pendientes por cancelar con los filtros actuales.</div>
+        <?php else: ?>
+        <div class="table-responsive">
+        <table class="table table-striped table-sm align-middle mb-0">
+         <thead>
+          <tr><th>Jornada</th><th>Misión</th><th>Miembro</th><th>Pend.</th><th>Pend. $</th><th></th></tr>
+         </thead>
+         <tbody>
+         <?php foreach ($pendientes as $e):
+            $pend = (int)$e['hallacas_entregadas'] - (int)$e['hallacas_pagadas'];
+            $pendMoney = $pend * (float)$e['precio_unitario'];
+         ?>
+         <tr>
+           <td><?= h($e['jornada_name']) ?></td>
+           <td><?= h($e['mission_name']) ?></td>
+           <td><?= h($e['member_name']) ?></td>
+           <td><strong><?= $pend ?></strong></td>
+           <td><strong><?= money($pendMoney) ?></strong></td>
+           <td class="text-end">
+             <button class="btn btn-sm btn-success"
+               data-bs-toggle="modal"
+               data-bs-target="#payModal"
+               data-entrega-id="<?= (int)$e['id'] ?>"
+               data-pend="<?= (int)$pend ?>"
+               data-member="<?= h($e['member_name']) ?>"
+               data-mission="<?= h($e['mission_name']) ?>"
+               data-jornada="<?= h($e['jornada_name']) ?>">
+               Pagar
+             </button>
+           </td>
+         </tr>
+         <?php endforeach; ?>
+         </tbody>
+        </table>
+        </div>
+        <?= pagination_render(
+            $pagination['cancelar']['total'],
+            $pagination['cancelar']['page'],
+            $pagination['cancelar']['per'],
+            'payments',
+            $pagination['cancelar']['param'],
+            array_merge($pagination['filters'], pagination_preserve($pagination['params'], $pagination['cancelar']['param']))
+        ) ?>
+        <?php endif; ?>
+      </div>
+    </div>
+  </div>
 </div>
-<?= pagination_render(
-    $pagination['confirmar']['total'],
-    $pagination['confirmar']['page'],
-    $pagination['confirmar']['per'],
-    'payments',
-    $pagination['confirmar']['param'],
-    array_merge($pagination['filters'], pagination_preserve($pagination['params'], $pagination['confirmar']['param']))
-) ?>
-<?php endif; ?>
-<?php else: ?>
-<div class="alert alert-info">Tus pagos registrados quedan <strong>pendientes por confirmar</strong> hasta que el administrador los valide.</div>
-<?php endif; ?>
-
-<h5>Pendientes por cancelar</h5>
-<?php if (empty($pendientes)): ?>
-<div class="alert alert-info">No hay hallacas pendientes por cancelar con los filtros actuales.</div>
-<?php else: ?>
-<div class="table-responsive">
-<table class="table table-striped table-sm align-middle">
- <thead>
-  <tr><th>Jornada</th><th>Fecha</th><th>Misión</th><th>Miembro</th><th>Entreg.</th><th>Pag.</th><th>Pend.</th><th>Precio</th><th>Pend. dinero</th><th>Registrar pago</th></tr>
- </thead>
- <tbody>
- <?php foreach ($pendientes as $e):
-    $pend = (int)$e['hallacas_entregadas'] - (int)$e['hallacas_pagadas'];
-    $pendMoney = $pend * (float)$e['precio_unitario'];
- ?>
- <tr>
-   <td><?= h($e['jornada_name']) ?></td>
-   <td><?= h($e['fecha']) ?></td>
-   <td><?= h($e['mission_name']) ?></td>
-   <td><?= h($e['member_name']) ?></td>
-   <td><?= (int)$e['hallacas_entregadas'] ?></td>
-   <td><?= (int)$e['hallacas_pagadas'] ?></td>
-   <td><strong><?= $pend ?></strong></td>
-   <td><?= money($e['precio_unitario']) ?></td>
-   <td><strong><?= money($pendMoney) ?></strong></td>
-   <td class="text-end">
-     <button class="btn btn-sm btn-success"
-       data-bs-toggle="modal"
-       data-bs-target="#payModal"
-       data-entrega-id="<?= (int)$e['id'] ?>"
-       data-pend="<?= (int)$pend ?>"
-       data-member="<?= h($e['member_name']) ?>"
-       data-mission="<?= h($e['mission_name']) ?>"
-       data-jornada="<?= h($e['jornada_name']) ?>">
-       Pagar
-     </button>
-   </td>
- </tr>
- <?php endforeach; ?>
- </tbody>
-</table>
-</div>
-<?= pagination_render(
-    $pagination['cancelar']['total'],
-    $pagination['cancelar']['page'],
-    $pagination['cancelar']['per'],
-    'payments',
-    $pagination['cancelar']['param'],
-    array_merge($pagination['filters'], pagination_preserve($pagination['params'], $pagination['cancelar']['param']))
-) ?>
-<?php endif; ?>
 
 <h5 class="mt-4">Historial reciente de pagos</h5>
 <?php if (empty($recientes)): ?>

@@ -1,6 +1,7 @@
 <?php include BASE_PATH . '/app/views/partials/header.php';
 $m = $mission ?? null;
 $isEdit = (bool)$m;
+page_back('missions', 'Volver a misiones');
 ?>
 <h2><?= $isEdit ? 'Editar misión' : 'Nueva misión' ?></h2>
 <form method="post" action="<?= url($isEdit ? 'mission_update' : 'mission_store') ?>" class="card p-3 shadow-sm">
@@ -36,7 +37,7 @@ $isEdit = (bool)$m;
   </div>
   <div class="d-flex flex-column flex-sm-row gap-2">
     <button class="btn btn-primary"><?= $isEdit ? 'Guardar' : 'Crear' ?></button>
-    <a class="btn btn-secondary" href="<?= url('missions') ?>">Cancelar</a>
+    <a class="btn btn-outline-secondary" href="<?= url('missions') ?>">Volver</a>
   </div>
 </form>
 <?php include BASE_PATH . '/app/views/partials/footer.php'; ?>

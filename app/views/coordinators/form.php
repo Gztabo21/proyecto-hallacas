@@ -1,5 +1,6 @@
 <?php include BASE_PATH . '/app/views/partials/header.php';
 $missions = $missions ?? Mission::all();
+page_back('coordinators', 'Volver a coordinadores');
 ?>
 <h2>Agregar coordinador</h2>
 <form method="post" action="<?= url('coordinator_store') ?>" class="card p-3 shadow-sm">
@@ -44,7 +45,7 @@ $missions = $missions ?? Mission::all();
   </div>
   <div class="d-flex flex-column flex-sm-row gap-2">
     <button class="btn btn-primary">Crear coordinador</button>
-    <a class="btn btn-secondary" href="<?= url('coordinators') ?>">Cancelar</a>
+    <a class="btn btn-outline-secondary" href="<?= url('coordinators') ?>">Volver</a>
   </div>
 </form>
 <?php include BASE_PATH . '/app/views/partials/footer.php'; ?>
