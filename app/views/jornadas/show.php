@@ -54,8 +54,26 @@ page_back('jornadas', 'Volver a jornadas');
   </div>
 </div>
 
+<?php
+$jornadaTabInventory = in_array(Auth::role(), ['admin', 'jornada_admin'], true);
+$jornadaActiveTab = (($_GET['tab'] ?? '') === 'inventario' && $jornadaTabInventory) ? 'inventario' : 'entregas';
+?>
+<?php if ($jornadaTabInventory): ?>
+<ul class="nav nav-tabs mb-3" id="jornadaDetailTabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link <?= $jornadaActiveTab === 'entregas' ? 'active' : '' ?>" id="jornada-tab-entregas" data-bs-toggle="tab" data-bs-target="#jornada-pane-entregas" type="button" role="tab" aria-controls="jornada-pane-entregas" aria-selected="<?= $jornadaActiveTab === 'entregas' ? 'true' : 'false' ?>">Entregas</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link <?= $jornadaActiveTab === 'inventario' ? 'active' : '' ?>" id="jornada-tab-inventario" data-bs-toggle="tab" data-bs-target="#jornada-pane-inventario" type="button" role="tab" aria-controls="jornada-pane-inventario" aria-selected="<?= $jornadaActiveTab === 'inventario' ? 'true' : 'false' ?>">Inventario de jornada</button>
+  </li>
+</ul>
+<div class="tab-content" id="jornadaDetailTabContent">
+<div class="tab-pane fade <?= $jornadaActiveTab === 'entregas' ? 'show active' : '' ?>" id="jornada-pane-entregas" role="tabpanel" aria-labelledby="jornada-tab-entregas" tabindex="0">
+<?php endif; ?>
+
+<div class="d-flex flex-wrap gap-2 mb-3">
 <?php if (Auth::isAdmin()): ?>
-<button type="button" class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#assignMissionModal">Asignar misión</button>
+<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#assignMissionModal">Asignar misión</button>
 <div class="modal fade" id="assignMissionModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <form method="post" action="<?= url('jornada_asignar') ?>" class="modal-content">
@@ -93,7 +111,7 @@ page_back('jornadas', 'Volver a jornadas');
 </div>
 <?php endif; ?>
 <?php if (Auth::isAdmin() || Auth::isCoordinator() || Auth::isJornadaAdmin()): ?>
-<button type="button" class="btn btn-success mb-3" data-bs-toggle="modal" data-bs-target="#distributeModal">Distribuir hallacas</button>
+<button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#distributeModal">Distribuir hallacas</button>
 <div class="modal fade" id="distributeModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <form method="post" action="<?= url('entrega_store') ?>" class="modal-content">
@@ -157,7 +175,7 @@ page_back('jornadas', 'Volver a jornadas');
   }
 })();
 </script>
-<button type="button" class="btn btn-warning mb-3 ms-sm-2" data-bs-toggle="modal" data-bs-target="#paymentModal">Registrar pago</button>
+<button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#paymentModal">Registrar pago</button>
 <div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <form method="post" action="<?= url('entrega_abono') ?>" class="modal-content" enctype="multipart/form-data">
@@ -274,12 +292,13 @@ page_back('jornadas', 'Volver a jornadas');
 })();
 </script>
 <?php endif; ?>
+</div>
 
 <?php if (empty($assigned)): ?>
 <div class="alert alert-info">No hay misiones asignadas a esta jornada.</div>
 <?php endif; ?>
 
-<div id="distribucion-equipo" class="mt-3">
+<div id="distribucion-equipo">
 <?php foreach ($assigned as $jm):
   $mid = (int)$jm['mission_id'];
   if (Auth::isCoordinator() && !Auth::isAdmin() && Auth::missionId() !== $mid) continue;
@@ -357,8 +376,160 @@ page_back('jornadas', 'Volver a jornadas');
    </div>
  </div>
 </div>
-</div>
 <?php endforeach; ?>
+</div>
+
+<?php if ($jornadaTabInventory): ?>
+</div>
+<div class="tab-pane fade <?= $jornadaActiveTab === 'inventario' ? 'show active' : '' ?>" id="jornada-pane-inventario" role="tabpanel" aria-labelledby="jornada-tab-inventario" tabindex="0">
+<div class="card mb-3">
+  <div class="card-header py-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <h5 class="mb-0">Entrega de ingredientes (inventario)</h5>
+    <a class="btn btn-sm btn-outline-secondary" href="<?= url('inventory') ?>">Ver inventario global</a>
+  </div>
+  <div class="card-body">
+    <?php if (empty($inventoryTablesReady)): ?>
+    <div class="alert alert-warning mb-0">Falta instalar las tablas de inventario. Ejecute <code>sql/003_inventory.sql</code> en MySQL o abra <a href="<?= url('inventory') ?>">Inventario</a> para ver las instrucciones.</div>
+    <?php else: ?>
+    <p class="text-muted small">Al entregar ingredientes a esta jornada se registra una <strong>salida</strong> de stock y queda en el historial.</p>
+    <form method="post" action="<?= url('inventory_jornada_deliver') ?>">
+      <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
+      <input type="hidden" name="jornada_id" value="<?= (int)$jornada['id'] ?>">
+      <div class="row g-2 mb-2">
+        <div class="col-md-3">
+          <label class="form-label small mb-0">Fecha</label>
+          <input type="date" name="fecha_ingreso" class="form-control form-control-sm" value="<?= h($jornada['fecha']) ?>">
+        </div>
+        <div class="col-md-9">
+          <label class="form-label small mb-0">Notas</label>
+          <input name="notes" class="form-control form-control-sm" placeholder="Entrega a elaboradores">
+        </div>
+      </div>
+      <div class="table-responsive">
+      <table class="table table-sm mb-2">
+        <thead><tr><th>Producto</th><th>Stock disp.</th><th>Cantidad a entregar</th></tr></thead>
+        <tbody>
+        <?php foreach ($inventoryProducts as $ip): ?>
+        <tr>
+          <td><?= h($ip['name']) ?> <small class="text-muted">(<?= h($ip['sku']) ?>)</small></td>
+          <td><?= h(rtrim(rtrim(number_format((float)$ip['stock'], 3, '.', ''), '0'), '.')) ?> <?= h($ip['unidad_metrica']) ?></td>
+          <td style="max-width:8rem">
+            <input type="hidden" name="product_id[]" value="<?= (int)$ip['id'] ?>">
+            <input type="number" step="0.001" min="0" name="cantidad[]" class="form-control form-control-sm" placeholder="0">
+          </td>
+        </tr>
+        <?php endforeach; ?>
+        <?php if (empty($inventoryProducts)): ?>
+        <tr><td colspan="3" class="text-muted">No hay productos en inventario. <a href="<?= url('inventory') ?>">Registrar productos</a></td></tr>
+        <?php endif; ?>
+        </tbody>
+      </table>
+      </div>
+      <?php if (!empty($inventoryProducts)): ?>
+      <button class="btn btn-sm btn-warning">Registrar salida a jornada</button>
+      <?php endif; ?>
+    </form>
+    <?php if (!empty($jornadaInventoryOut)): ?>
+    <h6 class="mt-3 mb-2">Salidas registradas en esta jornada</h6>
+    <div class="table-responsive">
+    <table class="table table-sm table-striped mb-0">
+      <thead><tr><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Registrado por</th></tr></thead>
+      <tbody>
+      <?php foreach ($jornadaInventoryOut as $jo): if ($jo['tipo'] !== 'salida_jornada') continue; ?>
+      <tr>
+        <td><?= h($jo['fecha_ingreso']) ?></td>
+        <td><?= h($jo['product_name']) ?></td>
+        <td><?= h(rtrim(rtrim(number_format((float)$jo['cantidad'], 3, '.', ''), '0'), '.')) ?> <?= h($jo['unidad_metrica']) ?></td>
+        <td><?= h($jo['created_by_name'] ?? '—') ?></td>
+      </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+    </div>
+    <?php endif; ?>
+
+    <?php
+    $balanceRows = array_values($jornadaInventoryBalance ?? []);
+    $returnable = array_filter($balanceRows, static fn($b) => ($b['pendiente_devolver'] ?? 0) > 0.0001);
+    ?>
+    <?php if (!empty($balanceRows)): ?>
+    <hr class="my-3">
+    <h6 class="mb-2">Excedentes / devolución a almacén</h6>
+    <p class="text-muted small mb-2">Lo no devuelto se considera <strong>consumido en jornada</strong> (entregado − devuelto). Al registrar excedentes, el stock vuelve al almacén.</p>
+    <div class="table-responsive mb-3">
+    <table class="table table-sm table-bordered mb-0">
+      <thead><tr><th>Producto</th><th>Entregado</th><th>Devuelto</th><th>Consumido (est.)</th><th>Pend. devolver</th></tr></thead>
+      <tbody>
+      <?php foreach ($balanceRows as $b): ?>
+      <tr>
+        <td><?= h($b['product_name']) ?> <small class="text-muted">(<?= h($b['sku']) ?>)</small></td>
+        <td><?= h(rtrim(rtrim(number_format((float)$b['entregado'], 3, '.', ''), '0'), '.')) ?> <?= h($b['unidad_metrica']) ?></td>
+        <td><?= h(rtrim(rtrim(number_format((float)$b['devuelto'], 3, '.', ''), '0'), '.')) ?> <?= h($b['unidad_metrica']) ?></td>
+        <td><?= h(rtrim(rtrim(number_format((float)$b['consumido'], 3, '.', ''), '0'), '.')) ?> <?= h($b['unidad_metrica']) ?></td>
+        <td><?= h(rtrim(rtrim(number_format((float)$b['pendiente_devolver'], 3, '.', ''), '0'), '.')) ?> <?= h($b['unidad_metrica']) ?></td>
+      </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+    </div>
+    <?php if (!empty($returnable)): ?>
+    <form method="post" action="<?= url('inventory_jornada_return') ?>">
+      <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
+      <input type="hidden" name="jornada_id" value="<?= (int)$jornada['id'] ?>">
+      <div class="row g-2 mb-2">
+        <div class="col-md-3">
+          <label class="form-label small mb-0">Fecha devolución</label>
+          <input type="date" name="fecha_ingreso" class="form-control form-control-sm" value="<?= h($jornada['fecha']) ?>">
+        </div>
+        <div class="col-md-9">
+          <label class="form-label small mb-0">Notas</label>
+          <input name="return_notes" class="form-control form-control-sm" placeholder="Excedente no usado">
+        </div>
+      </div>
+      <div class="table-responsive">
+      <table class="table table-sm mb-2">
+        <thead><tr><th>Producto</th><th>Máx. a devolver</th><th>Cantidad a devolver</th></tr></thead>
+        <tbody>
+        <?php foreach ($returnable as $b): ?>
+        <tr>
+          <td><?= h($b['product_name']) ?></td>
+          <td><?= h(rtrim(rtrim(number_format((float)$b['pendiente_devolver'], 3, '.', ''), '0'), '.')) ?> <?= h($b['unidad_metrica']) ?></td>
+          <td style="max-width:8rem">
+            <input type="hidden" name="return_product_id[]" value="<?= (int)$b['product_id'] ?>">
+            <input type="number" step="0.001" min="0" max="<?= h((string)$b['pendiente_devolver']) ?>" name="return_cantidad[]" class="form-control form-control-sm" placeholder="0">
+          </td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+      </div>
+      <button class="btn btn-sm btn-success">Registrar excedentes en almacén</button>
+    </form>
+    <?php endif; ?>
+    <?php endif; ?>
+    <?php endif; ?>
+  </div>
+</div>
+</div>
+</div>
+<script>
+(function(){
+  var tabs = document.getElementById('jornadaDetailTabs');
+  if (!tabs) return;
+  var jid = <?= (int)$jornada['id'] ?>;
+  tabs.querySelectorAll('button[data-bs-toggle="tab"]').forEach(function(btn){
+    btn.addEventListener('shown.bs.tab', function(){
+      var tab = btn.id === 'jornada-tab-inventario' ? 'inventario' : 'entregas';
+      var u = new URL(window.location.href);
+      u.searchParams.set('r', 'jornada_show');
+      u.searchParams.set('id', String(jid));
+      u.searchParams.set('tab', tab);
+      history.replaceState(null, '', u.pathname + '?' + u.searchParams.toString());
+    });
+  });
+})();
+</script>
+<?php endif; ?>
 
 <script>
 document.querySelectorAll('select[name="metodo"]').forEach(function(sel){

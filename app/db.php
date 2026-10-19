@@ -14,7 +14,13 @@ class DB {
             } catch (PDOException $e) {
                 error_log('DB connection failed: ' . $e->getMessage());
                 http_response_code(500);
-                die('No se pudo conectar a la base de datos.');
+                $msg = 'No se pudo conectar a la base de datos.';
+                if (defined('APP_DEBUG') && APP_DEBUG) {
+                    $msg .= ' Revise DB_HOST, DB_NAME, DB_USER y DB_PASS (.env o variables de entorno). Detalle: ' . $e->getMessage();
+                } else {
+                    $msg .= ' Configure el archivo .env en el servidor o las variables de entorno de MySQL.';
+                }
+                die($msg);
             }
         }
         return self::$pdo;

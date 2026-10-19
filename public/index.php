@@ -12,6 +12,7 @@ require_once __DIR__ . '/../app/controllers/JornadaController.php';
 require_once __DIR__ . '/../app/controllers/DistributionController.php';
 require_once __DIR__ . '/../app/controllers/ReportController.php';
 require_once __DIR__ . '/../app/controllers/PaymentController.php';
+require_once __DIR__ . '/../app/controllers/InventoryController.php';
 
 $route = $_GET['r'] ?? '';
 
@@ -148,6 +149,63 @@ switch ($route) {
         break;
     case 'reports':
         ReportController::index();
+        break;
+    case 'reports_pdf':
+        ReportController::pdf();
+        break;
+    case 'inventory':
+        InventoryController::index();
+        break;
+    case 'inventory_movements':
+        InventoryController::movements();
+        break;
+    case 'inventory_pdf':
+        InventoryController::catalogPdf();
+        break;
+    case 'inventory_movements_pdf':
+        InventoryController::movementsPdf();
+        break;
+    case 'inventory_product_create':
+        InventoryController::productCreate();
+        break;
+    case 'inventory_product_store':
+        InventoryController::productStore();
+        break;
+    case 'inventory_product_edit':
+        InventoryController::productEdit();
+        break;
+    case 'inventory_product_update':
+        InventoryController::productUpdate();
+        break;
+    case 'inventory_initial':
+        InventoryController::initialStockForm();
+        break;
+    case 'inventory_initial_store':
+        InventoryController::initialStockStore();
+        break;
+    case 'inventory_purchase':
+        InventoryController::purchaseForm();
+        break;
+    case 'inventory_purchase_store':
+        InventoryController::purchaseStore();
+        break;
+    case 'inventory_jornada_deliver':
+        InventoryController::jornadaDeliverStore();
+        break;
+    case 'inventory_jornada_return':
+        InventoryController::jornadaReturnStore();
+        break;
+    case 'inventory_export':
+        InventoryController::exportCsv();
+        break;
+    case 'inventory_template':
+        InventoryController::templateCsv();
+        break;
+    case 'inventory_import':
+        InventoryController::importForm();
+        break;
+    case 'inventory_import_store':
+        InventoryController::importStore();
         break;
     default:
         http_response_code(404);

@@ -84,6 +84,21 @@ class JornadaController {
         $entregas = Entrega::allByJornada($id);
         // price
         $precio = price_for_jornada($jornada);
+        $inventoryProducts = [];
+        $jornadaInventoryOut = [];
+        $jornadaInventoryBalance = [];
+        $inventoryTablesReady = false;
+        if (in_array(Auth::role(), ['admin', 'jornada_admin'], true)) {
+            try {
+                DB::query('SELECT 1 FROM inventory_products LIMIT 1');
+                $inventoryTablesReady = true;
+                $inventoryProducts = InventoryProduct::all();
+                $jornadaInventoryOut = InventoryMovement::byJornada($id);
+                $jornadaInventoryBalance = InventoryMovement::balanceByJornada($id);
+            } catch (PDOException $e) {
+                $inventoryTablesReady = false;
+            }
+        }
         include BASE_PATH . '/app/views/jornadas/show.php';
     }
     public static function edit(): void {

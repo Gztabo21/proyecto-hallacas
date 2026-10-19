@@ -20,6 +20,9 @@
         <?php if (in_array(Auth::role(), ['admin','coordinator','jornada_admin'], true)): ?>
         <li class="nav-item"><a class="nav-link" href="<?= url('jornadas') ?>">Jornadas</a></li>
         <?php endif; ?>
+        <?php if (in_array(Auth::role(), ['admin','jornada_admin'], true)): ?>
+        <li class="nav-item"><a class="nav-link" href="<?= url('inventory') ?>">Inventario</a></li>
+        <?php endif; ?>
         <?php if (Auth::isAdmin()): ?>
         <li class="nav-item"><a class="nav-link" href="<?= url('missions') ?>">Misiones</a></li>
         <li class="nav-item"><a class="nav-link" href="<?= url('users') ?>">Usuarios</a></li>

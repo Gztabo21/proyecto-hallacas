@@ -23,8 +23,16 @@ page_back('dashboard', 'Volver al dashboard');
         <?php endforeach; ?>
       </select>
     </div>
+    <div class="col-md-2 d-flex align-items-end gap-2">
+      <button class="btn btn-primary flex-grow-1">Filtrar</button>
+    </div>
     <div class="col-md-2 d-flex align-items-end">
-      <button class="btn btn-primary w-100">Filtrar</button>
+      <?php
+        $pdfParams = [];
+        if (!empty($_GET['jornada_id'])) $pdfParams['jornada_id'] = (int)$_GET['jornada_id'];
+        if (!empty($_GET['mission_id'])) $pdfParams['mission_id'] = (int)$_GET['mission_id'];
+      ?>
+      <a class="btn btn-outline-danger w-100" href="<?= url('reports_pdf', $pdfParams) ?>">Exportar PDF</a>
     </div>
   </div>
 </form>
