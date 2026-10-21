@@ -6,6 +6,34 @@ class Auth {
     public static function isAdmin(): bool { return self::role() === 'admin'; }
     public static function isCoordinator(): bool { return in_array(self::role(), ['admin','coordinator'], true); }
     public static function isJornadaAdmin(): bool { return self::role() === 'jornada_admin'; }
+    public static function isPurchaseAdmin(): bool { return self::role() === 'purchase_admin'; }
+    public static function isPurchaseCoordinator(): bool { return self::role() === 'purchase_coordinator'; }
+
+    public static function canAccessInventory(): bool {
+        return in_array(self::role(), ['admin', 'jornada_admin', 'purchase_admin', 'purchase_coordinator'], true);
+    }
+
+    public static function canManageInventoryCatalog(): bool {
+        return in_array(self::role(), ['admin', 'purchase_admin'], true);
+    }
+
+    /** Entregas / devoluciones de ingredientes en jornada (todas las jornadas para compras). */
+    public static function canManageJornadaInventory(?int $jornadaId = null): bool {
+        if (self::isAdmin() || self::isPurchaseAdmin() || self::isPurchaseCoordinator()) {
+            return true;
+        }
+        if (self::isJornadaAdmin() && $jornadaId !== null) {
+            return in_array($jornadaId, self::jornadaIds(), true);
+        }
+        if (self::isJornadaAdmin() && $jornadaId === null) {
+            return true;
+        }
+        return false;
+    }
+
+    public static function canAccessJornadasList(): bool {
+        return in_array(self::role(), ['admin', 'coordinator', 'jornada_admin', 'purchase_admin', 'purchase_coordinator'], true);
+    }
     public static function jornadaIds(): array {
         $u = self::user();
         if (!$u) return [];

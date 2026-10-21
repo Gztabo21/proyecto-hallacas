@@ -31,6 +31,8 @@ Puerto MySQL: localhost:3307 (usuario hallacas / hallacas_secret). Root: root_se
 - Coordinador Norte: coord.norte@jireh.local / password
 - Miembros: ana@jireh.local, luis@jireh.local, maria@jireh.local / password
 
+**Importar miembros:** menú Miembros → **Importar CSV** (columnas `nombre`, `email`, `mision`, etc.; plantilla descargable).
+
 ## Desarrollo local (sin Docker)
 Cree un archivo `.env` en la raíz con `APP_ENV`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` y `DB_PASS` (no se versiona).
 SQLite no soportado, requiere MySQL.
@@ -91,6 +93,17 @@ docker compose exec -T db mysql -uhallacas -phallacas_secret hallacas_jireh < sq
 ```
 
 Instalaciones nuevas con `sql/init.sql` ya incluyen inventario y el tipo `devolucion_jornada`.
+
+### Roles de compras
+
+- **purchase_admin** (Administrador de compras): inventario completo, catálogo de productos, entregas/devoluciones en jornadas.
+- **purchase_coordinator** (Coordinador de compras): inventario, compras, movimientos y entregas/devoluciones en jornadas (sin crear productos en catálogo).
+
+Migración de roles: `sql/005_roles_extend.sql`. Carga de equipo (16 misiones, 16 coordinadores, 12 admins de jornada, usuarios de compras): `sql/006_seed_missions_team.sql` (contraseña inicial `password`).
+
+### Usuarios y misiones
+
+En **Usuarios** y **Misiones** (admin): **Editar** cambia datos y estado; **Desactivar/Activar** sin borrar; **Eliminar** borra definitivamente (use desactivar si hay historial).
 
 ### CSV
 

@@ -8,7 +8,10 @@ page_back('dashboard', 'Volver al dashboard');
     <p class="text-muted small mb-0">Miembros de su misión</p>
     <?php endif; ?>
   </div>
-  <a class="btn btn-primary" href="<?= url('member_create') ?>">Nuevo miembro</a>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary" href="<?= url('member_import') ?>">Importar CSV</a>
+    <a class="btn btn-primary" href="<?= url('member_create') ?>">Nuevo miembro</a>
+  </div>
 </div>
 <div class="table-responsive">
 <table class="table table-striped table-hover table-sm">

@@ -12,6 +12,11 @@ class UserController {
         $userJornadaIds = [];
         include BASE_PATH . '/app/views/users/form.php';
     }
+    private static function sanitizeRole(string $role): string {
+        $allowed = array_keys(app_roles());
+        return in_array($role, $allowed, true) ? $role : 'member';
+    }
+
     public static function store(): void {
         require_role('admin');
         if (!csrf_verify()) { flash('error','CSRF inválido'); redirect('users'); }
@@ -20,7 +25,7 @@ class UserController {
             'email' => trim($_POST['email'] ?? ''),
             'password' => $_POST['password'] ?? '',
             'password_hash' => password_hash($_POST['password'] ?? 'password', PASSWORD_DEFAULT),
-            'role' => $_POST['role'] ?? 'member',
+            'role' => self::sanitizeRole($_POST['role'] ?? 'member'),
             'mission_id' => !empty($_POST['mission_id']) ? (int)$_POST['mission_id'] : null,
             'jornada_id' => null,
             'phone' => trim($_POST['phone'] ?? ''),
@@ -47,7 +52,7 @@ class UserController {
         $data = [
             'name' => trim($_POST['name'] ?? ''),
             'email' => trim($_POST['email'] ?? ''),
-            'role' => $_POST['role'] ?? 'member',
+            'role' => self::sanitizeRole($_POST['role'] ?? 'member'),
             'mission_id' => !empty($_POST['mission_id']) ? (int)$_POST['mission_id'] : null,
             'jornada_id' => !empty($_POST['jornada_id']) ? (int)$_POST['jornada_id'] : null,
             'phone' => trim($_POST['phone'] ?? ''),
@@ -63,8 +68,34 @@ class UserController {
         require_role('admin');
         if (!csrf_verify()) { flash('error','CSRF inválido'); redirect('users'); }
         $id = (int)($_POST['id'] ?? 0);
+        if ($id === (int)(Auth::user()['id'] ?? 0)) {
+            flash('error', 'No puede eliminar su propio usuario');
+            redirect('users');
+            return;
+        }
         User::delete($id);
         flash('success','Usuario eliminado');
+        redirect('users');
+    }
+
+    public static function toggleStatus(): void {
+        require_role('admin');
+        if (!csrf_verify()) { flash('error','CSRF inválido'); redirect('users'); }
+        $id = (int)($_POST['id'] ?? 0);
+        if ($id === (int)(Auth::user()['id'] ?? 0)) {
+            flash('error', 'No puede desactivar su propio usuario');
+            redirect('users');
+            return;
+        }
+        $user = User::find($id);
+        if (!$user) {
+            flash('error', 'Usuario no encontrado');
+            redirect('users');
+            return;
+        }
+        $next = ($user['status'] ?? 'active') === 'active' ? 'inactive' : 'active';
+        User::update($id, ['status' => $next]);
+        flash('success', $next === 'active' ? 'Usuario activado' : 'Usuario desactivado');
         redirect('users');
     }
 }

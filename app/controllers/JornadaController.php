@@ -2,7 +2,11 @@
 class JornadaController {
     public static function index(): void {
         require_login();
-        if (Auth::isAdmin()) {
+        if (!Auth::canAccessJornadasList()) {
+            http_response_code(403);
+            die('Acceso denegado.');
+        }
+        if (Auth::isAdmin() || Auth::isPurchaseAdmin() || Auth::isPurchaseCoordinator()) {
             $jornadas = Jornada::all();
             $where = 'WHERE 1=1';
             $params = [];
@@ -79,7 +83,11 @@ class JornadaController {
         // members grouped
         $membersByMission = [];
         foreach ($assigned as $jm) {
-            $membersByMission[$jm['mission_id']] = User::membersOfMission((int)$jm['mission_id']);
+            $mid = (int)$jm['mission_id'];
+            $membersByMission[(string)$mid] = array_map(
+                static fn(array $u): array => ['id' => (int)$u['id'], 'name' => (string)$u['name']],
+                User::membersOfMission($mid)
+            );
         }
         $entregas = Entrega::allByJornada($id);
         // price
@@ -88,7 +96,7 @@ class JornadaController {
         $jornadaInventoryOut = [];
         $jornadaInventoryBalance = [];
         $inventoryTablesReady = false;
-        if (in_array(Auth::role(), ['admin', 'jornada_admin'], true)) {
+        if (Auth::canAccessInventory()) {
             try {
                 DB::query('SELECT 1 FROM inventory_products LIMIT 1');
                 $inventoryTablesReady = true;

@@ -1,7 +1,27 @@
 <?php
 class InventoryController {
     private static function requireInventoryRole(): void {
-        require_role('admin', 'jornada_admin');
+        require_login();
+        if (!Auth::canAccessInventory()) {
+            http_response_code(403);
+            die('Acceso denegado.');
+        }
+    }
+
+    private static function requireInventoryCatalogRole(): void {
+        require_login();
+        if (!Auth::canManageInventoryCatalog()) {
+            http_response_code(403);
+            die('Acceso denegado.');
+        }
+    }
+
+    private static function assertJornadaInventory(int $jornadaId): void {
+        if (!Auth::canManageJornadaInventory($jornadaId)) {
+            flash('error', 'No autorizado');
+            redirect('jornadas');
+            exit;
+        }
     }
 
     private static function ensureTables(): bool {
@@ -158,7 +178,7 @@ class InventoryController {
     }
 
     public static function productCreate(): void {
-        require_role('admin');
+        self::requireInventoryCatalogRole();
         if (!self::ensureTables()) {
             return;
         }
@@ -166,7 +186,7 @@ class InventoryController {
     }
 
     public static function productStore(): void {
-        require_role('admin');
+        self::requireInventoryCatalogRole();
         if (!csrf_verify()) {
             flash('error', 'CSRF inválido');
             redirect('inventory');
@@ -190,7 +210,7 @@ class InventoryController {
     }
 
     public static function productEdit(): void {
-        require_role('admin');
+        self::requireInventoryCatalogRole();
         $id = (int)($_GET['id'] ?? 0);
         $product = InventoryProduct::find($id);
         if (!$product) {
@@ -202,7 +222,7 @@ class InventoryController {
     }
 
     public static function productUpdate(): void {
-        require_role('admin');
+        self::requireInventoryCatalogRole();
         if (!csrf_verify()) {
             flash('error', 'CSRF inválido');
             redirect('inventory');
@@ -302,11 +322,7 @@ class InventoryController {
             redirect('jornadas');
             return;
         }
-        if (Auth::isJornadaAdmin() && !in_array($jid, Auth::jornadaIds(), true)) {
-            flash('error', 'No autorizado');
-            redirect('jornadas');
-            return;
-        }
+        self::assertJornadaInventory($jid);
         $fecha = $_POST['fecha_ingreso'] ?? $jornada['fecha'];
         $productIds = $_POST['product_id'] ?? [];
         $cantidades = $_POST['cantidad'] ?? [];
@@ -358,11 +374,7 @@ class InventoryController {
             redirect('jornadas');
             return;
         }
-        if (Auth::isJornadaAdmin() && !in_array($jid, Auth::jornadaIds(), true)) {
-            flash('error', 'No autorizado');
-            redirect('jornadas');
-            return;
-        }
+        self::assertJornadaInventory($jid);
         $fecha = $_POST['fecha_ingreso'] ?? $jornada['fecha'];
         $productIds = $_POST['return_product_id'] ?? [];
         $cantidades = $_POST['return_cantidad'] ?? [];

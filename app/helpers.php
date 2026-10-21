@@ -91,6 +91,22 @@ function require_role(string ...$roles): void {
     }
 }
 
+/** @return array<string,string> slug => etiqueta */
+function app_roles(): array {
+    return [
+        'admin' => 'Administrador',
+        'coordinator' => 'Coordinador de misión',
+        'jornada_admin' => 'Administrador de jornada',
+        'purchase_admin' => 'Administrador de compras',
+        'purchase_coordinator' => 'Coordinador de compras',
+        'member' => 'Miembro',
+    ];
+}
+
+function role_label(string $role): string {
+    return app_roles()[$role] ?? $role;
+}
+
 function payment_methods(): array {
     $raw = setting('payment_methods', null);
     $res = [];

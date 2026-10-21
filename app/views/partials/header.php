@@ -17,10 +17,10 @@
       <ul class="navbar-nav me-auto">
         <?php if (Auth::check()): ?>
         <li class="nav-item"><a class="nav-link" href="<?= url('dashboard') ?>">Dashboard</a></li>
-        <?php if (in_array(Auth::role(), ['admin','coordinator','jornada_admin'], true)): ?>
+        <?php if (Auth::canAccessJornadasList()): ?>
         <li class="nav-item"><a class="nav-link" href="<?= url('jornadas') ?>">Jornadas</a></li>
         <?php endif; ?>
-        <?php if (in_array(Auth::role(), ['admin','jornada_admin'], true)): ?>
+        <?php if (Auth::canAccessInventory()): ?>
         <li class="nav-item"><a class="nav-link" href="<?= url('inventory') ?>">Inventario</a></li>
         <?php endif; ?>
         <?php if (Auth::isAdmin()): ?>
@@ -39,7 +39,7 @@
       </ul>
       <ul class="navbar-nav">
         <?php if (Auth::check()): ?>
-        <li class="nav-item"><span class="nav-link text-light small"><?= h(Auth::user()['name']) ?> · <?= h(Auth::role()) ?></span></li>
+        <li class="nav-item"><span class="nav-link text-light small"><?= h(Auth::user()['name']) ?> · <?= h(role_label(Auth::role())) ?></span></li>
         <li class="nav-item"><a class="nav-link" href="<?= url('logout') ?>">Salir</a></li>
         <?php endif; ?>
       </ul>

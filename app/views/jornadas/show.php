@@ -55,10 +55,14 @@ page_back('jornadas', 'Volver a jornadas');
 </div>
 
 <?php
-$jornadaTabInventory = in_array(Auth::role(), ['admin', 'jornada_admin'], true);
+$jornadaTabEntregas = in_array(Auth::role(), ['admin', 'coordinator', 'jornada_admin'], true);
+$jornadaTabInventory = Auth::canAccessInventory();
 $jornadaActiveTab = (($_GET['tab'] ?? '') === 'inventario' && $jornadaTabInventory) ? 'inventario' : 'entregas';
+if (!$jornadaTabEntregas && $jornadaTabInventory) {
+    $jornadaActiveTab = 'inventario';
+}
 ?>
-<?php if ($jornadaTabInventory): ?>
+<?php if ($jornadaTabInventory && $jornadaTabEntregas): ?>
 <ul class="nav nav-tabs mb-3" id="jornadaDetailTabs" role="tablist">
   <li class="nav-item" role="presentation">
     <button class="nav-link <?= $jornadaActiveTab === 'entregas' ? 'active' : '' ?>" id="jornada-tab-entregas" data-bs-toggle="tab" data-bs-target="#jornada-pane-entregas" type="button" role="tab" aria-controls="jornada-pane-entregas" aria-selected="<?= $jornadaActiveTab === 'entregas' ? 'true' : 'false' ?>">Entregas</button>
@@ -71,6 +75,7 @@ $jornadaActiveTab = (($_GET['tab'] ?? '') === 'inventario' && $jornadaTabInvento
 <div class="tab-pane fade <?= $jornadaActiveTab === 'entregas' ? 'show active' : '' ?>" id="jornada-pane-entregas" role="tabpanel" aria-labelledby="jornada-tab-entregas" tabindex="0">
 <?php endif; ?>
 
+<?php if ($jornadaTabEntregas): ?>
 <div class="d-flex flex-wrap gap-2 mb-3">
 <?php if (Auth::isAdmin()): ?>
 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#assignMissionModal">Asignar misión</button>
@@ -158,10 +163,29 @@ $jornadaActiveTab = (($_GET['tab'] ?? '') === 'inventario' && $jornadaTabInvento
   var membersByMission = <?= json_encode($membersByMission, JSON_UNESCAPED_UNICODE) ?>;
   var missionSel = document.getElementById('distMission');
   var memberSel = document.getElementById('distMember');
+  var distributeModal = document.getElementById('distributeModal');
+  function membersForMission(mid) {
+    if (!membersByMission || mid === null || mid === undefined || mid === '') return [];
+    var key = String(mid);
+    return membersByMission[key] || [];
+  }
   function updateMembers(mid){
     if (!memberSel) return;
-    memberSel.innerHTML = '<option value="">Seleccionar miembro</option>';
-    var list = (membersByMission && membersByMission[mid]) ? membersByMission[mid] : [];
+    memberSel.innerHTML = '';
+    var list = membersForMission(mid);
+    if (!list.length) {
+      var empty = document.createElement('option');
+      empty.value = '';
+      empty.textContent = 'No hay miembros activos en esta misión';
+      memberSel.appendChild(empty);
+      memberSel.disabled = true;
+      return;
+    }
+    memberSel.disabled = false;
+    var placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Seleccionar miembro';
+    memberSel.appendChild(placeholder);
     list.forEach(function(m){
       var opt = document.createElement('option');
       opt.value = m.id;
@@ -172,6 +196,11 @@ $jornadaActiveTab = (($_GET['tab'] ?? '') === 'inventario' && $jornadaTabInvento
   if (missionSel){
     missionSel.addEventListener('change', function(){ updateMembers(this.value); });
     updateMembers(missionSel.value);
+  }
+  if (distributeModal) {
+    distributeModal.addEventListener('show.bs.modal', function(){
+      if (missionSel) updateMembers(missionSel.value);
+    });
   }
 })();
 </script>
@@ -294,6 +323,7 @@ $jornadaActiveTab = (($_GET['tab'] ?? '') === 'inventario' && $jornadaTabInvento
 <?php endif; ?>
 </div>
 
+<?php if ($jornadaTabEntregas): ?>
 <?php if (empty($assigned)): ?>
 <div class="alert alert-info">No hay misiones asignadas a esta jornada.</div>
 <?php endif; ?>
@@ -378,10 +408,13 @@ $jornadaActiveTab = (($_GET['tab'] ?? '') === 'inventario' && $jornadaTabInvento
 </div>
 <?php endforeach; ?>
 </div>
+<?php endif; ?>
 
 <?php if ($jornadaTabInventory): ?>
+<?php if ($jornadaTabEntregas): ?>
 </div>
 <div class="tab-pane fade <?= $jornadaActiveTab === 'inventario' ? 'show active' : '' ?>" id="jornada-pane-inventario" role="tabpanel" aria-labelledby="jornada-tab-inventario" tabindex="0">
+<?php endif; ?>
 <div class="card mb-3">
   <div class="card-header py-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
     <h5 class="mb-0">Entrega de ingredientes (inventario)</h5>
@@ -510,6 +543,7 @@ $jornadaActiveTab = (($_GET['tab'] ?? '') === 'inventario' && $jornadaTabInvento
     <?php endif; ?>
   </div>
 </div>
+<?php if ($jornadaTabEntregas): ?>
 </div>
 </div>
 <script>
@@ -529,6 +563,7 @@ $jornadaActiveTab = (($_GET['tab'] ?? '') === 'inventario' && $jornadaTabInvento
   });
 })();
 </script>
+<?php endif; ?>
 <?php endif; ?>
 
 <script>

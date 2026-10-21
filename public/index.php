@@ -51,6 +51,9 @@ switch ($route) {
     case 'mission_delete':
         MissionController::delete();
         break;
+    case 'mission_toggle_status':
+        MissionController::toggleStatus();
+        break;
     case 'users':
         UserController::index();
         break;
@@ -69,6 +72,9 @@ switch ($route) {
     case 'user_delete':
         UserController::delete();
         break;
+    case 'user_toggle_status':
+        UserController::toggleStatus();
+        break;
     case 'members':
         MemberController::index();
         break;
@@ -83,6 +89,15 @@ switch ($route) {
         break;
     case 'member_update':
         MemberController::update();
+        break;
+    case 'member_import':
+        MemberController::importForm();
+        break;
+    case 'member_import_store':
+        MemberController::importStore();
+        break;
+    case 'member_import_template':
+        MemberController::importTemplate();
         break;
     case 'coordinators':
         CoordinatorController::index();

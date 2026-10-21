@@ -12,11 +12,16 @@
    <td><?= (int)$u['id'] ?></td>
    <td><?= h($u['name']) ?></td>
    <td><?= h($u['email']) ?></td>
-   <td><?= h($u['role']) ?></td>
+   <td><?= h(role_label($u['role'])) ?></td>
    <td><?= h($u['mission_name'] ?? '-') ?></td>
    <td><?= status_badge($u['status']) ?></td>
    <td>
      <a class="btn btn-sm btn-outline-primary" href="<?= url('user_edit',['id'=>$u['id']]) ?>">Editar</a>
+     <form method="post" action="<?= url('user_toggle_status') ?>" class="d-inline">
+       <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
+       <input type="hidden" name="id" value="<?= (int)$u['id'] ?>">
+       <button class="btn btn-sm btn-outline-secondary"><?= ($u['status'] ?? 'active') === 'active' ? 'Desactivar' : 'Activar' ?></button>
+     </form>
      <form method="post" action="<?= url('user_delete') ?>" class="d-inline" onsubmit="return confirm('Eliminar usuario?')">
        <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
        <input type="hidden" name="id" value="<?= (int)$u['id'] ?>">

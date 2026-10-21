@@ -40,7 +40,14 @@ class User {
         DB::query('UPDATE users SET ' . implode(',', $sets) . ' WHERE id = ?', $p);
     }
     public static function membersOfMission(int $missionId): array {
-        return self::all('member', $missionId);
+        return DB::query(
+            'SELECT u.*, m.name AS mission_name
+             FROM users u
+             LEFT JOIN missions m ON m.id = u.mission_id
+             WHERE u.role = ? AND u.mission_id = ? AND u.status = ?
+             ORDER BY u.name',
+            ['member', $missionId, 'active']
+        )->fetchAll();
     }
     public static function delete(int $id): void {
         DB::query('DELETE FROM users WHERE id = ?', [$id]);

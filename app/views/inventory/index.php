@@ -22,7 +22,7 @@ $inventoryUsd = static function (array $p): ?float {
     <a class="btn btn-outline-dark btn-sm" href="<?= url('inventory_import') ?>">Importar CSV</a>
     <a class="btn btn-success btn-sm" href="<?= url('inventory_purchase') ?>">Registrar compra</a>
     <a class="btn btn-warning btn-sm" href="<?= url('inventory_initial') ?>">Stock inicial</a>
-    <?php if (Auth::isAdmin()): ?>
+    <?php if (Auth::canManageInventoryCatalog()): ?>
     <a class="btn btn-primary btn-sm" href="<?= url('inventory_product_create') ?>">Nuevo producto</a>
     <?php endif; ?>
   </div>
@@ -40,12 +40,12 @@ $inventoryUsd = static function (array $p): ?float {
       <th class="text-end">Tasa</th>
       <th class="text-end">Precio USD</th>
       <th>Fecha ingreso</th>
-      <?php if (Auth::isAdmin()): ?><th></th><?php endif; ?>
+      <?php if (Auth::canManageInventoryCatalog()): ?><th></th><?php endif; ?>
     </tr>
   </thead>
   <tbody>
   <?php if (empty($products)): ?>
-  <tr><td colspan="<?= Auth::isAdmin() ? 9 : 8 ?>" class="text-muted text-center py-4">No hay productos. Cree el catálogo y registre stock inicial o compras.</td></tr>
+  <tr><td colspan="<?= Auth::canManageInventoryCatalog() ? 9 : 8 ?>" class="text-muted text-center py-4">No hay productos. Cree el catálogo y registre stock inicial o compras.</td></tr>
   <?php else: foreach ($products as $p):
     $usd = $inventoryUsd($p);
   ?>
@@ -58,7 +58,7 @@ $inventoryUsd = static function (array $p): ?float {
     <td class="text-end"><?= ($p['ultima_tasa'] !== null && $p['ultima_tasa'] !== '') ? h(rtrim(rtrim(number_format((float)$p['ultima_tasa'], 4, '.', ''), '0'), '.')) : '—' ?></td>
     <td class="text-end"><?= $usd !== null ? money($usd) : '—' ?></td>
     <td><?= !empty($p['ultima_fecha_ingreso']) ? h($p['ultima_fecha_ingreso']) : '—' ?></td>
-    <?php if (Auth::isAdmin()): ?>
+    <?php if (Auth::canManageInventoryCatalog()): ?>
     <td><a class="btn btn-sm btn-outline-primary" href="<?= url('inventory_product_edit', ['id' => (int)$p['id']]) ?>">Editar</a></td>
     <?php endif; ?>
   </tr>

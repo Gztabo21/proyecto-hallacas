@@ -53,4 +53,20 @@ class MissionController {
         flash('success','Misión eliminada');
         redirect('missions');
     }
+
+    public static function toggleStatus(): void {
+        require_role('admin');
+        if (!csrf_verify()) { flash('error','CSRF inválido'); redirect('missions'); }
+        $id = (int)($_POST['id'] ?? 0);
+        $mission = Mission::find($id);
+        if (!$mission) {
+            flash('error', 'Misión no encontrada');
+            redirect('missions');
+            return;
+        }
+        $next = ($mission['status'] ?? 'active') === 'active' ? 'inactive' : 'active';
+        Mission::update($id, ['status' => $next]);
+        flash('success', $next === 'active' ? 'Misión activada' : 'Misión desactivada');
+        redirect('missions');
+    }
 }

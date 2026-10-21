@@ -10,6 +10,14 @@ class DashboardController {
             self::member();
             return;
         }
+        if (Auth::isPurchaseAdmin() || Auth::isPurchaseCoordinator()) {
+            redirect('inventory');
+            return;
+        }
+        if (Auth::isJornadaAdmin()) {
+            redirect('jornadas');
+            return;
+        }
         self::admin();
     }
 

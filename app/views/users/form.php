@@ -25,8 +25,8 @@ page_back('users', 'Volver a usuarios');
     <div class="col-md-6 mb-3">
       <label class="form-label">Rol</label>
       <select name="role" class="form-select">
-        <?php foreach (['admin','coordinator','jornada_admin','member'] as $r): ?>
-        <option value="<?= $r ?>" <?= (($u['role'] ?? 'member')===$r)?'selected':'' ?>><?= $r ?></option>
+        <?php foreach (app_roles() as $slug => $label): ?>
+        <option value="<?= h($slug) ?>" <?= (($u['role'] ?? 'member') === $slug) ? 'selected' : '' ?>><?= h($label) ?></option>
         <?php endforeach; ?>
       </select>
     </div>

@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS users (
   name VARCHAR(120) NOT NULL,
   email VARCHAR(190) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
-  role ENUM('admin','coordinator','jornada_admin','member') NOT NULL DEFAULT 'member',
+  role VARCHAR(40) NOT NULL DEFAULT 'member',
   mission_id INT NULL,
   jornada_id INT NULL,
   phone VARCHAR(40) NULL,

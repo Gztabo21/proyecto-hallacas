@@ -11,6 +11,47 @@ class Mission {
         $r = $stmt->fetch();
         return $r ?: null;
     }
+
+    /** Resuelve misión desde CSV: id, código (M01), nombre o «Misión 3». */
+    public static function resolveImportReference(string $cell, bool $onlyActive = true): ?int {
+        $cell = trim($cell);
+        if ($cell === '') {
+            return null;
+        }
+        $missions = self::all($onlyActive);
+        if (ctype_digit($cell)) {
+            $id = (int)$cell;
+            foreach ($missions as $m) {
+                if ((int)$m['id'] === $id) {
+                    return $id;
+                }
+            }
+            return null;
+        }
+        $compact = strtoupper(str_replace([' ', '-', '_'], '', $cell));
+        foreach ($missions as $m) {
+            $code = strtoupper(str_replace([' ', '-', '_'], '', (string)$m['code']));
+            if ($code !== '' && $code === $compact) {
+                return (int)$m['id'];
+            }
+        }
+        $lower = mb_strtolower($cell, 'UTF-8');
+        foreach ($missions as $m) {
+            if (mb_strtolower((string)$m['name'], 'UTF-8') === $lower) {
+                return (int)$m['id'];
+            }
+        }
+        if (preg_match('/(\d+)/u', $cell, $mm)) {
+            $n = (int)$mm[1];
+            $code = 'M' . str_pad((string)$n, 2, '0', STR_PAD_LEFT);
+            foreach ($missions as $m) {
+                if (strcasecmp((string)$m['code'], $code) === 0) {
+                    return (int)$m['id'];
+                }
+            }
+        }
+        return null;
+    }
     public static function create(array $data): int {
         DB::query('INSERT INTO missions (name,code,description,coordinator_id,status) VALUES (?,?,?,?,?)',
             [$data['name'],$data['code'],$data['description'] ?? null, $data['coordinator_id'] ?? null, $data['status'] ?? 'active']);
