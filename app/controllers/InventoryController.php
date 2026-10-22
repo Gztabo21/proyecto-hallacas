@@ -44,12 +44,26 @@ class InventoryController {
         }
     }
 
+    /** @return array{0: string, 1: string} */
+    private static function parseIndexSort(): array {
+        $sort = (string)($_GET['sort'] ?? 'name');
+        if (!in_array($sort, ['name', 'sku'], true)) {
+            $sort = 'name';
+        }
+        $dir = strtolower((string)($_GET['dir'] ?? 'asc'));
+        if (!in_array($dir, ['asc', 'desc'], true)) {
+            $dir = 'asc';
+        }
+        return [$sort, $dir];
+    }
+
     public static function index(): void {
         self::requireInventoryRole();
         if (!self::ensureTables()) {
             return;
         }
-        $products = InventoryProduct::allForIndex();
+        [$inventorySort, $inventorySortDir] = self::parseIndexSort();
+        $products = InventoryProduct::allForIndex($inventorySort, $inventorySortDir);
         include BASE_PATH . '/app/views/inventory/index.php';
     }
 
@@ -282,8 +296,16 @@ class InventoryController {
             redirect('inventory');
         }
         $fecha = $_POST['fecha'] ?? date('Y-m-d');
+        $esDonacion = !empty($_POST['es_donacion']);
         $tasa = (float)($_POST['tasa'] ?? 0);
         $notes = trim($_POST['notes'] ?? '');
+        $referencia = trim($_POST['referencia'] ?? '');
+        $donante = trim($_POST['donante'] ?? '');
+        if ($esDonacion && $donante === '') {
+            flash('error', 'Indique el donante cuando la compra es una donación');
+            redirect('inventory_purchase');
+            return;
+        }
         if ($tasa <= 0) {
             flash('error', 'Indique la tasa del día de compra');
             redirect('inventory_purchase');
@@ -297,7 +319,14 @@ class InventoryController {
         }
         try {
             InventoryPurchase::create(
-                ['fecha' => $fecha, 'tasa' => $tasa, 'notes' => $notes],
+                [
+                    'fecha' => $fecha,
+                    'tasa' => $tasa,
+                    'notes' => $notes !== '' ? $notes : null,
+                    'es_donacion' => $esDonacion,
+                    'donante' => $esDonacion && $donante !== '' ? $donante : null,
+                    'referencia' => $referencia !== '' ? $referencia : null,
+                ],
                 $lines,
                 Auth::user()['id'] ?? null
             );

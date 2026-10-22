@@ -84,3 +84,5 @@ require_once __DIR__ . '/models/Pago.php';
 require_once __DIR__ . '/models/InventoryProduct.php';
 require_once __DIR__ . '/models/InventoryMovement.php';
 require_once __DIR__ . '/models/InventoryPurchase.php';
+require_once __DIR__ . '/models/RolePermission.php';
+require_once __DIR__ . '/models/JornadaMesa.php';

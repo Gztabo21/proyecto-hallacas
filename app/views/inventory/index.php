@@ -12,6 +12,14 @@ $inventoryUsd = static function (array $p): ?float {
     }
     return null;
 };
+$inventorySort = $inventorySort ?? 'name';
+$inventorySortDir = $inventorySortDir ?? 'asc';
+$invSortLink = static function (string $col, string $label) use ($inventorySort, $inventorySortDir): string {
+    $nextDir = ($inventorySort === $col && $inventorySortDir === 'asc') ? 'desc' : 'asc';
+    $href = url('inventory', ['sort' => $col, 'dir' => $nextDir]);
+    $arrow = $inventorySort === $col ? ($inventorySortDir === 'asc' ? ' ↑' : ' ↓') : '';
+    return '<a href="' . h($href) . '" class="text-decoration-none text-reset">' . h($label) . $arrow . '</a>';
+};
 ?>
 <div class="d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center gap-2 mb-3">
   <h2 class="mb-0">Inventario</h2>
@@ -32,8 +40,8 @@ $inventoryUsd = static function (array $p): ?float {
 <table class="table table-striped table-sm align-middle">
   <thead>
     <tr>
-      <th>Producto</th>
-      <th>SKU</th>
+      <th><?= $invSortLink('name', 'Producto') ?></th>
+      <th><?= $invSortLink('sku', 'SKU') ?></th>
       <th>Stock</th>
       <th>Unidad</th>
       <th class="text-end">Precio Bs</th>
@@ -44,10 +52,25 @@ $inventoryUsd = static function (array $p): ?float {
     </tr>
   </thead>
   <tbody>
+  <?php
+  $invTotalStock = 0.0;
+  $invTotalValorBs = 0.0;
+  $invTotalValorUsd = 0.0;
+  $invTotalConPrecio = 0;
+  ?>
   <?php if (empty($products)): ?>
   <tr><td colspan="<?= Auth::canManageInventoryCatalog() ? 9 : 8 ?>" class="text-muted text-center py-4">No hay productos. Cree el catálogo y registre stock inicial o compras.</td></tr>
   <?php else: foreach ($products as $p):
     $usd = $inventoryUsd($p);
+    $stock = (float)$p['stock'];
+    $invTotalStock += $stock;
+    if ($stock > 0 && $usd !== null) {
+        $invTotalValorUsd += $stock * $usd;
+        $invTotalConPrecio++;
+    }
+    if ($stock > 0 && $p['ultimo_precio_bs'] !== null && $p['ultimo_precio_bs'] !== '') {
+        $invTotalValorBs += $stock * (float)$p['ultimo_precio_bs'];
+    }
   ?>
   <tr>
     <td><?= h($p['name']) ?></td>
@@ -62,8 +85,23 @@ $inventoryUsd = static function (array $p): ?float {
     <td><a class="btn btn-sm btn-outline-primary" href="<?= url('inventory_product_edit', ['id' => (int)$p['id']]) ?>">Editar</a></td>
     <?php endif; ?>
   </tr>
-  <?php endforeach; endif; ?>
+  <?php endforeach; ?>
   </tbody>
+  <tfoot class="table-light">
+  <tr class="fw-semibold">
+    <td colspan="2">Totales · <?= count($products) ?> productos</td>
+    <td><?= h(rtrim(rtrim(number_format($invTotalStock, 3, '.', ''), '0'), '.')) ?></td>
+    <td class="small text-muted">Σ stock</td>
+    <td class="text-end"><?= $invTotalValorBs > 0 ? money($invTotalValorBs) : '—' ?></td>
+    <td></td>
+    <td class="text-end"><?= $invTotalValorUsd > 0 ? money($invTotalValorUsd) : '—' ?></td>
+    <td colspan="<?= Auth::canManageInventoryCatalog() ? 2 : 1 ?>" class="small text-muted">Valor = stock × último precio</td>
+  </tr>
+  </tfoot>
+  <?php endif; ?>
 </table>
 </div>
+<?php if (!empty($products)): ?>
+<p class="text-muted small mb-0">La suma de stock mezcla unidades distintas (kg, l, unidades). Los montos en Bs/USD solo incluyen productos con stock y último precio registrado<?= $invTotalConPrecio > 0 && $invTotalConPrecio < count($products) ? ' (' . $invTotalConPrecio . ' de ' . count($products) . ')' : '' ?>.</p>
+<?php endif; ?>
 <?php include BASE_PATH . '/app/views/partials/footer.php'; ?>

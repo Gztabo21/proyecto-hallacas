@@ -23,7 +23,22 @@ docker compose up -d
 ```
 Abrir: http://localhost:8080
 
-Puerto MySQL: localhost:3307 (usuario hallacas / hallacas_secret). Root: root_secret
+Puerto MySQL en el host: **3307** (usuario `hallacas` / `hallacas_secret`). Root: `root_secret`
+
+### DBeaver CE (con Docker Compose)
+
+1. Levante la base: `docker compose up -d db` (o `docker compose up -d`).
+2. Nueva conexión → **MySQL**:
+   - **Host:** `localhost` (misma máquina) o la IP del servidor si conecta remoto
+   - **Puerto:** `3307` (o el valor de `MYSQL_PUBLISH_PORT` en su `.env`)
+   - **Base de datos:** `hallacas_jireh`
+   - **Usuario:** `hallacas`
+   - **Contraseña:** `hallacas_secret` (la del `docker-compose.yml`)
+3. Driver MySQL: use **SSL desactivado** en entorno local si no configura certificados.
+
+Para usar otro puerto en el host, cree `.env` con `MYSQL_PUBLISH_PORT=3308` y ejecute `docker compose up -d`.
+
+**Remoto:** abra el puerto en el firewall solo si lo necesita; en producción prefiera túnel SSH en lugar de exponer MySQL a internet.
 
 ## Credenciales demo
 - Admin: admin@jireh.local / admin123
@@ -40,6 +55,13 @@ SQLite no soportado, requiere MySQL.
 ## Despliegue en servidor
 
 ### Opción A: Docker Compose (recomendado)
+La imagen `app` usa **PHP 8.2.35** (Apache). Actualice tras parches de seguridad:
+```bash
+docker compose build --no-cache app
+docker compose up -d
+docker compose exec app php -v   # debe mostrar 8.2.35
+```
+
 En el servidor, con el proyecto clonado:
 ```bash
 docker compose up -d --build
@@ -59,7 +81,8 @@ docker compose exec -T db mysql -uhallacas -phallacas_secret hallacas_jireh < sq
    mysql -u root -p < sql/init.sql
    ```
 3. En la raíz del proyecto: cree `.env` con las variables de MySQL (`DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASS`, etc.).
-4. PHP con extensiones `pdo_mysql` y `mysqli`.
+4. PHP **8.2.35+** (rama 8.2), **8.3.36+**, **8.4.27+** o **8.5.12+** según su rama — parche del 21-oct-2026 para CVE-2026-109618 / CVE-2026-109619 (RCE; muy grave con **Apache mod_php**).
+5. Extensiones `pdo_mysql` y `mysqli`.
 
 ### Si aparece «No se pudo conectar a la base de datos»
 - MySQL está corriendo y escucha en `DB_HOST` / `DB_PORT`.

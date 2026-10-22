@@ -27,10 +27,15 @@
         <li class="nav-item"><a class="nav-link" href="<?= url('missions') ?>">Misiones</a></li>
         <li class="nav-item"><a class="nav-link" href="<?= url('users') ?>">Usuarios</a></li>
         <li class="nav-item"><a class="nav-link" href="<?= url('coordinators') ?>">Coordinadores</a></li>
+        <li class="nav-item"><a class="nav-link" href="<?= url('role_permissions') ?>">Permisos</a></li>
         <?php endif; ?>
-        <?php if (in_array(Auth::role(), ['admin','coordinator'], true)): ?>
+        <?php if (Auth::isAdmin() || Auth::isCoordinator()): ?>
         <li class="nav-item"><a class="nav-link" href="<?= url('members') ?>">Miembros</a></li>
+        <?php endif; ?>
+        <?php if (Auth::can('pagos', 'create') || Auth::can('pagos', 'edit') || Auth::isAdmin()): ?>
         <li class="nav-item"><a class="nav-link" href="<?= url('payments') ?>">Pagos</a></li>
+        <?php endif; ?>
+        <?php if (Auth::isAdmin() || Auth::isCoordinator()): ?>
         <li class="nav-item"><a class="nav-link" href="<?= url('reports') ?>">Reportes</a></li>
         <?php endif; ?>
         <?php else: ?>

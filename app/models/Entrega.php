@@ -52,7 +52,7 @@ class Entrega {
             Pago::create(['entrega_id'=>$id,'hallacas'=>$deltaH,'monto'=>$deltaM,'metodo'=>$metodo ?: 'abono','notes'=>$notes,'created_by'=>$userId]);
         }
     }
-    public static function registrarAbono(int $entregaId, int $hallacas, float $monto, string $metodo, ?string $notes, ?int $userId, string $moneda = 'VES', ?float $tasa = null, ?string $captura = null): void {
+    public static function registrarAbono(int $entregaId, int $hallacas, float $monto, string $metodo, ?string $notes, ?int $userId, string $moneda = 'VES', ?float $tasa = null, ?string $captura = null, ?string $referencia = null): void {
         $e = self::find($entregaId);
         if (!$e) return;
         $hp = $hallacas;
@@ -67,6 +67,7 @@ class Entrega {
             'monto'=>$monto,
             'moneda'=>$moneda,
             'metodo'=>$metodo,
+            'referencia'=>$referencia,
             'tasa'=>$tasa,
             'captura'=>$captura,
             'status'=>'pendiente',
@@ -75,4 +76,41 @@ class Entrega {
         ]);
     }
     public static function delete(int $id): void { DB::query('DELETE FROM entregas WHERE id=?', [$id]); }
+
+    /** @return string|null mensaje de error o null si ok */
+    public static function setHallacasEntregadas(int $id, int $nueva): ?string {
+        $e = self::find($id);
+        if (!$e) {
+            return 'Entrega no encontrada';
+        }
+        $nueva = max(0, $nueva);
+        $pagadas = (int)$e['hallacas_pagadas'];
+        if ($nueva < $pagadas) {
+            return 'No puede ser menor que las hallacas ya pagadas (' . $pagadas . ')';
+        }
+        $jid = (int)$e['jornada_id'];
+        $mid = (int)$e['mission_id'];
+        $assigned = 0;
+        foreach (Jornada::missionsFor($jid) as $jm) {
+            if ((int)$jm['mission_id'] === $mid) {
+                $assigned = (int)$jm['hallacas_asignadas'];
+            }
+        }
+        $sumOthers = (int)DB::query(
+            'SELECT COALESCE(SUM(hallacas_entregadas),0) s FROM entregas WHERE jornada_id=? AND mission_id=? AND id<>?',
+            [$jid, $mid, $id]
+        )->fetch()['s'];
+        if ($sumOthers + $nueva > $assigned) {
+            $max = max(0, $assigned - $sumOthers);
+            return 'Supera el cupo de la misión. Máximo para esta persona: ' . $max;
+        }
+        $status = 'pendiente';
+        if ($nueva > 0 && $pagadas >= $nueva) {
+            $status = 'pagado';
+        } elseif ($pagadas > 0) {
+            $status = 'parcial';
+        }
+        DB::query('UPDATE entregas SET hallacas_entregadas=?, status=? WHERE id=?', [$nueva, $status, $id]);
+        return null;
+    }
 }

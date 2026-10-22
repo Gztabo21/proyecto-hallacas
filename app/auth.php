@@ -34,6 +34,10 @@ class Auth {
     public static function canAccessJornadasList(): bool {
         return in_array(self::role(), ['admin', 'coordinator', 'jornada_admin', 'purchase_admin', 'purchase_coordinator'], true);
     }
+
+    public static function can(string $resource, string $action): bool {
+        return RolePermission::allows(self::role(), $resource, $action);
+    }
     public static function jornadaIds(): array {
         $u = self::user();
         if (!$u) return [];

@@ -98,6 +98,7 @@ CREATE TABLE IF NOT EXISTS pagos (
   monto DECIMAL(12,2) NOT NULL DEFAULT 0.00,
   moneda ENUM('USD','VES') NOT NULL DEFAULT 'VES',
   metodo VARCHAR(60) NULL,
+  referencia VARCHAR(120) NULL,
   tasa DECIMAL(12,4) NULL,
   captura LONGTEXT NULL,
   status ENUM('pendiente','confirmado') NOT NULL DEFAULT 'pendiente',
@@ -135,6 +136,9 @@ CREATE TABLE IF NOT EXISTS inventory_purchases (
   fecha DATE NOT NULL,
   tasa DECIMAL(12,4) NOT NULL,
   notes TEXT NULL,
+  es_donacion TINYINT(1) NOT NULL DEFAULT 0,
+  donante VARCHAR(160) NULL,
+  referencia VARCHAR(120) NULL,
   created_by INT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
@@ -180,6 +184,50 @@ ON DUPLICATE KEY UPDATE name=VALUES(name);
 
 UPDATE missions SET coordinator_id=2 WHERE id=1;
 UPDATE missions SET coordinator_id=3 WHERE id=2;
+
+CREATE TABLE IF NOT EXISTS jornada_mesas (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  jornada_id INT NOT NULL,
+  name VARCHAR(80) NOT NULL,
+  notes TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_jm_jornada (jornada_id),
+  FOREIGN KEY (jornada_id) REFERENCES jornadas(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS jornada_mesa_personas (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  mesa_id INT NOT NULL,
+  persona_nombre VARCHAR(120) NOT NULL,
+  user_id INT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_jmp_mesa (mesa_id),
+  FOREIGN KEY (mesa_id) REFERENCES jornada_mesas(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS jornada_mesa_retiros (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  mesa_id INT NOT NULL,
+  cantidad INT NOT NULL,
+  retirado_at DATETIME NOT NULL,
+  notes TEXT NULL,
+  created_by INT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_jmr_mesa (mesa_id),
+  KEY idx_jmr_retirado (retirado_at),
+  FOREIGN KEY (mesa_id) REFERENCES jornada_mesas(id) ON DELETE CASCADE,
+  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS role_permissions (
+  role VARCHAR(40) NOT NULL,
+  resource VARCHAR(60) NOT NULL,
+  can_create TINYINT(1) NOT NULL DEFAULT 0,
+  can_edit TINYINT(1) NOT NULL DEFAULT 0,
+  can_delete TINYINT(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (role, resource)
+) ENGINE=InnoDB;
 
 ALTER TABLE users AUTO_INCREMENT=7;
 ALTER TABLE missions AUTO_INCREMENT=3;

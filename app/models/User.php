@@ -49,6 +49,49 @@ class User {
             ['member', $missionId, 'active']
         )->fetchAll();
     }
+
+    /** Miembros activos + coordinador de la misión (para distribuir hallacas). */
+    public static function distributionRecipientsForMission(int $missionId): array {
+        $byId = [];
+        foreach (self::membersOfMission($missionId) as $u) {
+            $byId[(int)$u['id']] = $u;
+        }
+        $coords = DB::query(
+            'SELECT u.*, m.name AS mission_name
+             FROM users u
+             LEFT JOIN missions m ON m.id = u.mission_id
+             WHERE u.role = ? AND u.mission_id = ? AND u.status = ?',
+            ['coordinator', $missionId, 'active']
+        )->fetchAll();
+        foreach ($coords as $u) {
+            $byId[(int)$u['id']] = $u;
+        }
+        $mission = Mission::find($missionId);
+        if ($mission && !empty($mission['coordinator_id'])) {
+            $cid = (int)$mission['coordinator_id'];
+            if (!isset($byId[$cid])) {
+                $coord = self::find($cid);
+                if ($coord && ($coord['status'] ?? '') === 'active') {
+                    $byId[$cid] = $coord;
+                }
+            }
+        }
+        $list = array_values($byId);
+        usort($list, static fn(array $a, array $b): int => strcasecmp((string)$a['name'], (string)$b['name']));
+        return $list;
+    }
+
+    public static function canReceiveHallacaDistribution(int $userId, int $missionId): bool {
+        $u = self::find($userId);
+        if (!$u || ($u['status'] ?? '') !== 'active') {
+            return false;
+        }
+        if ((int)($u['mission_id'] ?? 0) === $missionId && in_array($u['role'] ?? '', ['member', 'coordinator'], true)) {
+            return true;
+        }
+        $mission = Mission::find($missionId);
+        return $mission && (int)($mission['coordinator_id'] ?? 0) === $userId;
+    }
     public static function delete(int $id): void {
         DB::query('DELETE FROM users WHERE id = ?', [$id]);
     }

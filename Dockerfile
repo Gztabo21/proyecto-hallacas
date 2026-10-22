@@ -1,4 +1,5 @@
-FROM php:8.2-apache
+# PHP 8.2.35+ (21 Oct 2026): parche CVE-2026-109618 / CVE-2026-109619 (RCE; crítico con Apache mod_php).
+FROM php:8.2.35-apache
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git unzip libpng-dev libjpeg62-turbo-dev libfreetype6-dev \

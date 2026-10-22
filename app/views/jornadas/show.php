@@ -57,25 +57,38 @@ page_back('jornadas', 'Volver a jornadas');
 <?php
 $jornadaTabEntregas = in_array(Auth::role(), ['admin', 'coordinator', 'jornada_admin'], true);
 $jornadaTabInventory = Auth::canAccessInventory();
-$jornadaActiveTab = (($_GET['tab'] ?? '') === 'inventario' && $jornadaTabInventory) ? 'inventario' : 'entregas';
-if (!$jornadaTabEntregas && $jornadaTabInventory) {
-    $jornadaActiveTab = 'inventario';
+$jornadaTabPagos = $jornadaTabPagos ?? false;
+$jornadaTabProduccion = $jornadaTabProduccion ?? false;
+$jornadaTabLabels = [];
+if ($jornadaTabEntregas) {
+    $jornadaTabLabels['entregas'] = 'Entregas';
 }
+if ($jornadaTabPagos) {
+    $jornadaTabLabels['pagos'] = 'Pagos';
+}
+if ($jornadaTabProduccion) {
+    $jornadaTabLabels['produccion'] = 'Producción';
+}
+if ($jornadaTabInventory) {
+    $jornadaTabLabels['inventario'] = 'Inventario de jornada';
+}
+$jornadaReqTab = (string)($_GET['tab'] ?? '');
+$jornadaActiveTab = isset($jornadaTabLabels[$jornadaReqTab]) ? $jornadaReqTab : array_key_first($jornadaTabLabels);
+$jornadaUseTabs = count($jornadaTabLabels) > 1;
 ?>
-<?php if ($jornadaTabInventory && $jornadaTabEntregas): ?>
+<?php if ($jornadaUseTabs): ?>
 <ul class="nav nav-tabs mb-3" id="jornadaDetailTabs" role="tablist">
+  <?php foreach ($jornadaTabLabels as $tabKey => $tabLabel): ?>
   <li class="nav-item" role="presentation">
-    <button class="nav-link <?= $jornadaActiveTab === 'entregas' ? 'active' : '' ?>" id="jornada-tab-entregas" data-bs-toggle="tab" data-bs-target="#jornada-pane-entregas" type="button" role="tab" aria-controls="jornada-pane-entregas" aria-selected="<?= $jornadaActiveTab === 'entregas' ? 'true' : 'false' ?>">Entregas</button>
+    <button class="nav-link <?= $jornadaActiveTab === $tabKey ? 'active' : '' ?>" id="jornada-tab-<?= h($tabKey) ?>" data-bs-toggle="tab" data-bs-target="#jornada-pane-<?= h($tabKey) ?>" type="button" role="tab" data-jornada-tab-key="<?= h($tabKey) ?>" aria-controls="jornada-pane-<?= h($tabKey) ?>" aria-selected="<?= $jornadaActiveTab === $tabKey ? 'true' : 'false' ?>"><?= h($tabLabel) ?></button>
   </li>
-  <li class="nav-item" role="presentation">
-    <button class="nav-link <?= $jornadaActiveTab === 'inventario' ? 'active' : '' ?>" id="jornada-tab-inventario" data-bs-toggle="tab" data-bs-target="#jornada-pane-inventario" type="button" role="tab" aria-controls="jornada-pane-inventario" aria-selected="<?= $jornadaActiveTab === 'inventario' ? 'true' : 'false' ?>">Inventario de jornada</button>
-  </li>
+  <?php endforeach; ?>
 </ul>
 <div class="tab-content" id="jornadaDetailTabContent">
-<div class="tab-pane fade <?= $jornadaActiveTab === 'entregas' ? 'show active' : '' ?>" id="jornada-pane-entregas" role="tabpanel" aria-labelledby="jornada-tab-entregas" tabindex="0">
 <?php endif; ?>
-
 <?php if ($jornadaTabEntregas): ?>
+<?php if ($jornadaUseTabs): ?><div class="tab-pane fade <?= $jornadaActiveTab === 'entregas' ? 'show active' : '' ?>" id="jornada-pane-entregas" role="tabpanel" aria-labelledby="jornada-tab-entregas" tabindex="0"><?php endif; ?>
+
 <div class="d-flex flex-wrap gap-2 mb-3">
 <?php if (Auth::isAdmin()): ?>
 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#assignMissionModal">Asignar misión</button>
@@ -138,9 +151,46 @@ if (!$jornadaTabEntregas && $jornadaTabInventory) {
         </div>
         <div class="mb-3">
           <label class="form-label">Miembro del equipo</label>
-          <select name="member_id" id="distMember" class="form-select" required>
-            <option value="">Seleccionar miembro</option>
-          </select>
+          <div class="input-group">
+            <select name="member_id" id="distMember" class="form-select" required>
+              <option value="">Seleccionar miembro</option>
+            </select>
+            <button type="button" class="btn btn-outline-primary px-3" id="distMemberAddBtn" title="Agregar miembro o coordinador" aria-label="Agregar miembro">+</button>
+          </div>
+          <div class="collapse mt-2 border rounded p-3 bg-light" id="distQuickMemberPanel">
+            <p class="small text-muted mb-2 mb-md-1">Al guardar queda seleccionado arriba sin recargar la página.</p>
+            <div class="row g-2">
+              <div class="col-md-6">
+                <label class="form-label small mb-0">Nombre</label>
+                <input type="text" class="form-control form-control-sm" id="distQuickName" autocomplete="name">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small mb-0">Correo</label>
+                <input type="email" class="form-control form-control-sm" id="distQuickEmail" autocomplete="email">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small mb-0">Contraseña</label>
+                <input type="text" class="form-control form-control-sm" id="distQuickPassword" placeholder="Opcional (se genera)">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small mb-0">Teléfono</label>
+                <input type="text" class="form-control form-control-sm" id="distQuickPhone">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small mb-0">Rol</label>
+                <select class="form-select form-select-sm" id="distQuickRole">
+                  <option value="member">Miembro</option>
+                  <?php if (Auth::isAdmin()): ?><option value="coordinator">Coordinador</option><?php endif; ?>
+                </select>
+              </div>
+            </div>
+            <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+              <button type="button" class="btn btn-sm btn-primary" id="distQuickMemberSave">Guardar y seleccionar</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#distQuickMemberPanel">Cancelar</button>
+              <span class="small text-danger d-none" id="distQuickMemberError"></span>
+              <span class="small text-success d-none" id="distQuickMemberOk"></span>
+            </div>
+          </div>
         </div>
         <div class="mb-3">
           <label class="form-label">Hallacas entregadas</label>
@@ -158,21 +208,19 @@ if (!$jornadaTabEntregas && $jornadaTabInventory) {
     </form>
   </div>
 </div>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script>
 (function(){
-  var membersByMission = <?= json_encode($membersByMission, JSON_UNESCAPED_UNICODE) ?>;
+  window.membersByMission = <?= json_encode($membersByMission, JSON_UNESCAPED_UNICODE) ?>;
+  var membersByMission = window.membersByMission;
   var missionSel = document.getElementById('distMission');
   var memberSel = document.getElementById('distMember');
   var distributeModal = document.getElementById('distributeModal');
-  function membersForMission(mid) {
-    if (!membersByMission || mid === null || mid === undefined || mid === '') return [];
-    var key = String(mid);
-    return membersByMission[key] || [];
-  }
-  function updateMembers(mid){
+  window.distUpdateMembers = function(mid, selectId){
     if (!memberSel) return;
     memberSel.innerHTML = '';
-    var list = membersForMission(mid);
+    var key = String(mid);
+    var list = (membersByMission && key) ? (membersByMission[key] || []) : [];
     if (!list.length) {
       var empty = document.createElement('option');
       empty.value = '';
@@ -192,16 +240,199 @@ if (!$jornadaTabEntregas && $jornadaTabInventory) {
       opt.textContent = m.name;
       memberSel.appendChild(opt);
     });
-  }
+    if (selectId) {
+      memberSel.value = String(selectId);
+    }
+  };
   if (missionSel){
-    missionSel.addEventListener('change', function(){ updateMembers(this.value); });
-    updateMembers(missionSel.value);
+    missionSel.addEventListener('change', function(){ window.distUpdateMembers(this.value); });
+    window.distUpdateMembers(missionSel.value);
   }
   if (distributeModal) {
-    distributeModal.addEventListener('show.bs.modal', function(){
-      if (missionSel) updateMembers(missionSel.value);
+    distributeModal.addEventListener('show.bs.modal', function(ev){
+      var btn = ev.relatedTarget;
+      var mid = btn && btn.getAttribute('data-mission-id');
+      var memberId = btn && btn.getAttribute('data-member-id');
+      if (missionSel && mid) {
+        missionSel.value = mid;
+        window.distUpdateMembers(mid, memberId || null);
+      } else if (missionSel) {
+        window.distUpdateMembers(missionSel.value);
+      }
     });
   }
+})();
+jQuery(function($){
+  var quickUrl = <?= json_encode(url('distribution_quick_member')) ?>;
+  var jornadaId = <?= (int)$jornada['id'] ?>;
+  var csrf = <?= json_encode(csrf_token()) ?>;
+  var panelEl = document.getElementById('distQuickMemberPanel');
+  var panel = panelEl ? bootstrap.Collapse.getOrCreateInstance(panelEl, { toggle: false }) : null;
+
+  $('#distMemberAddBtn').on('click', function(){
+    if (!panel) return;
+    panel.show();
+    $('#distQuickMemberError').addClass('d-none').text('');
+    $('#distQuickMemberOk').addClass('d-none').text('');
+  });
+
+  $('#distQuickMemberSave').on('click', function(){
+    var $btn = $(this).prop('disabled', true);
+    var missionId = $('#distMission').val();
+    $('#distQuickMemberError').addClass('d-none').text('');
+    $('#distQuickMemberOk').addClass('d-none').text('');
+    $.ajax({
+      url: quickUrl,
+      method: 'POST',
+      dataType: 'json',
+      data: {
+        csrf: csrf,
+        jornada_id: jornadaId,
+        mission_id: missionId,
+        name: $('#distQuickName').val(),
+        email: $('#distQuickEmail').val(),
+        password: $('#distQuickPassword').val(),
+        phone: $('#distQuickPhone').val(),
+        role: $('#distQuickRole').val()
+      }
+    }).done(function(resp){
+      if (!resp || !resp.ok) {
+        $('#distQuickMemberError').removeClass('d-none').text((resp && resp.error) ? resp.error : 'No se pudo guardar');
+        return;
+      }
+      var mid = String(resp.mission_id);
+      if (!window.membersByMission[mid]) window.membersByMission[mid] = [];
+      var exists = window.membersByMission[mid].some(function(m){ return String(m.id) === String(resp.member.id); });
+      if (!exists) window.membersByMission[mid].push(resp.member);
+      window.distUpdateMembers(mid, resp.member.id);
+      var okMsg = 'Agregado y seleccionado.';
+      if (resp.temp_password) okMsg += ' Contraseña temporal: ' + resp.temp_password;
+      $('#distQuickMemberOk').removeClass('d-none').text(okMsg);
+      $('#distQuickName, #distQuickEmail, #distQuickPassword, #distQuickPhone').val('');
+      if (panel) panel.hide();
+    }).fail(function(xhr){
+      var msg = 'Error de conexión';
+      try {
+        var j = xhr.responseJSON;
+        if (j && j.error) msg = j.error;
+      } catch (e) {}
+      $('#distQuickMemberError').removeClass('d-none').text(msg);
+    }).always(function(){
+      $btn.prop('disabled', false);
+    });
+  });
+});
+</script>
+<div class="modal fade" id="correctMissionAssignModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form method="post" action="<?= url('jornada_corregir_asignacion') ?>" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Corregir asignación a la misión</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
+        <input type="hidden" name="jornada_id" value="<?= (int)$jornada['id'] ?>">
+        <input type="hidden" name="mission_id" id="correct_mission_id" value="">
+        <div class="mb-3">
+          <label class="form-label">Misión</label>
+          <input type="text" class="form-control" id="correct_mission_assign_name" readonly>
+        </div>
+        <div class="alert alert-info py-2 small mb-3">Actual: <strong id="correct_mission_assign_actual">0</strong> asignadas · <strong id="correct_mission_entregadas">0</strong> entregadas a miembros</div>
+        <div class="mb-3">
+          <label class="form-label">Nueva cantidad asignada</label>
+          <input type="number" name="hallacas_asignadas" id="correct_mission_assign_cantidad" class="form-control" min="0" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Motivo (opcional)</label>
+          <input type="text" name="correccion_nota" class="form-control" placeholder="Ej. error al asignar">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary">Guardar corrección</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+(function(){
+  var modal = document.getElementById('correctMissionAssignModal');
+  if (!modal) return;
+  modal.addEventListener('show.bs.modal', function(ev){
+    var btn = ev.relatedTarget;
+    if (!btn) return;
+    document.getElementById('correct_mission_id').value = btn.getAttribute('data-mission-id') || '';
+    document.getElementById('correct_mission_assign_name').value = btn.getAttribute('data-mission-name') || '';
+    var actual = parseInt(btn.getAttribute('data-asignadas') || '0', 10);
+    var entregadas = parseInt(btn.getAttribute('data-entregadas') || '0', 10);
+    var maxAttr = btn.getAttribute('data-max-asign');
+    document.getElementById('correct_mission_assign_actual').textContent = actual;
+    document.getElementById('correct_mission_entregadas').textContent = entregadas;
+    var inp = document.getElementById('correct_mission_assign_cantidad');
+    if (inp) {
+      inp.min = entregadas;
+      inp.value = actual;
+      if (maxAttr !== null && maxAttr !== '') {
+        inp.max = parseInt(maxAttr, 10);
+      } else {
+        inp.removeAttribute('max');
+      }
+    }
+  });
+})();
+</script>
+<div class="modal fade" id="correctEntregaModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form method="post" action="<?= url('entrega_correct') ?>" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Corregir hallacas entregadas</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
+        <input type="hidden" name="entrega_id" id="correct_entrega_id" value="">
+        <p class="mb-2"><strong id="correct_member"></strong><br><small class="text-muted" id="correct_mission"></small></p>
+        <div class="alert alert-info py-2 small">Actual: <strong id="correct_actual">0</strong> entregadas · <strong id="correct_pagadas">0</strong> pagadas · Máximo permitido: <strong id="correct_max">0</strong></div>
+        <div class="mb-3">
+          <label class="form-label">Nueva cantidad entregada</label>
+          <input type="number" name="hallacas_entregadas" id="correct_cantidad" class="form-control" min="0" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Motivo (opcional)</label>
+          <input type="text" name="correccion_nota" class="form-control" placeholder="Ej. error al registrar">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary">Guardar corrección</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+(function(){
+  var modal = document.getElementById('correctEntregaModal');
+  if (!modal) return;
+  modal.addEventListener('show.bs.modal', function(ev){
+    var btn = ev.relatedTarget;
+    if (!btn) return;
+    document.getElementById('correct_entrega_id').value = btn.getAttribute('data-entrega-id') || '';
+    document.getElementById('correct_member').textContent = btn.getAttribute('data-member-name') || '';
+    document.getElementById('correct_mission').textContent = btn.getAttribute('data-mission-name') || '';
+    var actual = parseInt(btn.getAttribute('data-entregadas') || '0', 10);
+    var pagadas = parseInt(btn.getAttribute('data-pagadas') || '0', 10);
+    var max = parseInt(btn.getAttribute('data-max') || '0', 10);
+    document.getElementById('correct_actual').textContent = actual;
+    document.getElementById('correct_pagadas').textContent = pagadas;
+    document.getElementById('correct_max').textContent = max;
+    var inp = document.getElementById('correct_cantidad');
+    if (inp) {
+      inp.min = pagadas;
+      inp.max = max;
+      inp.value = actual;
+    }
+  });
 })();
 </script>
 <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#paymentModal">Registrar pago</button>
@@ -243,6 +474,10 @@ if (!$jornadaTabEntregas && $jornadaTabInventory) {
         <div class="mb-3 d-none" id="payCaptureGroup">
           <label class="form-label">Capture de pago (imagen)</label>
           <input type="file" name="captura" class="form-control" accept="image/*">
+        </div>
+        <div class="mb-3 d-none" id="payReferenciaGroup">
+          <label class="form-label">Referencia <span class="text-danger">*</span></label>
+          <input type="text" name="referencia" id="pay_referencia" class="form-control" maxlength="120" placeholder="Nº de referencia del pago móvil">
         </div>
         <div class="mb-3">
           <label class="form-label">Método de pago</label>
@@ -300,12 +535,30 @@ if (!$jornadaTabEntregas && $jornadaTabInventory) {
     var isPago = lower.indexOf('pago') !== -1 || lower.indexOf('movil') !== -1 || lower.indexOf('móvil') !== -1;
     var tg = document.getElementById('payTasaGroup');
     var cg = document.getElementById('payCaptureGroup');
+    var rg = document.getElementById('payReferenciaGroup');
+    var refInp = document.getElementById('pay_referencia');
     if (tg) tg.classList.toggle('d-none', cur === 'USD');
     if (cg) cg.classList.toggle('d-none', !isPago);
+    if (rg) rg.classList.toggle('d-none', !isPago);
+    if (refInp) refInp.required = isPago;
   }
   if (methodSel) { methodSel.addEventListener('change', togglePayFields); }
   var curSel = methodSel ? methodSel.parentElement.querySelector('select[name="metodo_otro_currency"]') : null;
   if (curSel) { curSel.addEventListener('change', togglePayFields); }
+  var payForm = modal ? modal.querySelector('form') : null;
+  if (payForm) {
+    payForm.addEventListener('submit', function(ev){
+      togglePayFields();
+      var refInp = document.getElementById('pay_referencia');
+      var m = methodSel ? methodSel.value : '';
+      var lower = m.toLowerCase();
+      var isPago = lower.indexOf('pago') !== -1 || lower.indexOf('movil') !== -1 || lower.indexOf('móvil') !== -1;
+      if (isPago && refInp && !refInp.value.trim()) {
+        ev.preventDefault();
+        alert('Indique la referencia del pago móvil');
+      }
+    });
+  }
   if (modal) {
     modal.addEventListener('show.bs.modal', function(event){
       var btn = event.relatedTarget;
@@ -323,7 +576,6 @@ if (!$jornadaTabEntregas && $jornadaTabInventory) {
 <?php endif; ?>
 </div>
 
-<?php if ($jornadaTabEntregas): ?>
 <?php if (empty($assigned)): ?>
 <div class="alert alert-info">No hay misiones asignadas a esta jornada.</div>
 <?php endif; ?>
@@ -332,15 +584,31 @@ if (!$jornadaTabEntregas && $jornadaTabInventory) {
 <?php foreach ($assigned as $jm):
   $mid = (int)$jm['mission_id'];
   if (Auth::isCoordinator() && !Auth::isAdmin() && Auth::missionId() !== $mid) continue;
-  $members = $membersByMission[$mid] ?? User::membersOfMission($mid);
+  $members = $membersByMission[$mid] ?? User::distributionRecipientsForMission($mid);
   // delivered totals
   $deliv = DB::query('SELECT COALESCE(SUM(hallacas_entregadas),0) s, COALESCE(SUM(hallacas_pagadas),0) p, COALESCE(SUM(monto_pagado),0) mp FROM entregas WHERE jornada_id=? AND mission_id=?', [(int)$jornada['id'],$mid])->fetch();
   $remaining = (int)$jm['hallacas_asignadas'] - (int)$deliv['s'];
+  $asignadasMission = (int)$jm['hallacas_asignadas'];
+  $entregadasMission = (int)$deliv['s'];
+  $maxAsignMission = $totalHechas !== null
+      ? max($entregadasMission, $totalHechas - ($totalAsignadasJornada - $asignadasMission))
+      : null;
 ?>
 <div class="card mb-3">
  <div class="card-header d-flex flex-column flex-md-row flex-wrap justify-content-between align-items-stretch align-items-md-center gap-2">
    <strong><?= h($jm['mission_name']) ?></strong>
-   <span>Asignadas: <?= (int)$jm['hallacas_asignadas'] ?> | Entregadas: <?= (int)$deliv['s'] ?> | Pagadas: <?= (int)$deliv['p'] ?> | Pendientes: <?= (int)$deliv['s']-(int)$deliv['p'] ?> | Restantes por distribuir: <strong><?= $remaining ?></strong></span>
+   <div class="d-flex flex-wrap align-items-center gap-2">
+   <span>Asignadas: <?= $asignadasMission ?> | Entregadas: <?= $entregadasMission ?> | Pagadas: <?= (int)$deliv['p'] ?> | Pendientes: <?= $entregadasMission-(int)$deliv['p'] ?> | Restantes por distribuir: <strong><?= $remaining ?></strong></span>
+   <?php if (Auth::isAdmin() || Auth::isCoordinator()): ?>
+   <button type="button" class="btn btn-sm btn-outline-primary btn-correct-mission-assign"
+     data-bs-toggle="modal" data-bs-target="#correctMissionAssignModal"
+     data-mission-id="<?= $mid ?>"
+     data-mission-name="<?= h($jm['mission_name']) ?>"
+     data-asignadas="<?= $asignadasMission ?>"
+     data-entregadas="<?= $entregadasMission ?>"
+     <?php if ($maxAsignMission !== null): ?>data-max-asign="<?= (int)$maxAsignMission ?>"<?php endif; ?>>Corregir asignación</button>
+   <?php endif; ?>
+   </div>
  </div>
  <div class="card-body">
    <?php if (Auth::isAdmin() || Auth::isCoordinator()): ?>
@@ -371,6 +639,14 @@ if (!$jornadaTabEntregas && $jornadaTabInventory) {
             <?php if (Auth::isAdmin() || Auth::isCoordinator() || Auth::isJornadaAdmin()): ?>
             <!-- Abono -->
             <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#paymentModal" data-entrega-id="<?= (int)$e['id'] ?>">Abonar</button>
+            <button type="button" class="btn btn-sm btn-outline-primary btn-correct-entrega"
+              data-bs-toggle="modal" data-bs-target="#correctEntregaModal"
+              data-entrega-id="<?= (int)$e['id'] ?>"
+              data-member-name="<?= h($mem['name']) ?>"
+              data-mission-name="<?= h($jm['mission_name']) ?>"
+              data-entregadas="<?= (int)$e['hallacas_entregadas'] ?>"
+              data-pagadas="<?= (int)$e['hallacas_pagadas'] ?>"
+              data-max="<?= (int)$remaining + (int)$e['hallacas_entregadas'] ?>">Corregir</button>
             <form method="post" action="<?= url('entrega_delete') ?>" class="d-inline" onsubmit="return confirm('Eliminar entrega?')">
               <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
               <input type="hidden" name="entrega_id" value="<?= (int)$e['id'] ?>">
@@ -383,17 +659,10 @@ if (!$jornadaTabEntregas && $jornadaTabInventory) {
           <td>0</td><td>0</td><td>0</td><td><?= status_badge('pendiente') ?></td><td><?= money(0) ?></td>
           <td>
             <?php if (($jornada['status']==='open') && (Auth::isAdmin() || Auth::isCoordinator() || Auth::isJornadaAdmin())): ?>
-            <form method="post" action="<?= url('entrega_store') ?>" class="row g-1">
-              <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
-              <input type="hidden" name="jornada_id" value="<?= (int)$jornada['id'] ?>">
-              <input type="hidden" name="mission_id" value="<?= $mid ?>">
-              <input type="hidden" name="member_id" value="<?= (int)$mem['id'] ?>">
-              <div class="col"><input type="number" name="hallacas_entregadas" class="form-control form-control-sm" placeholder="cant." min="0" required></div>
-              <div class="col"><input type="number" name="hallacas_pagadas" class="form-control form-control-sm" placeholder="pagadas" min="0" value="0"></div>
-              <div class="col"><input type="number" step="0.01" name="monto_pagado" class="form-control form-control-sm" placeholder="monto" value="0"></div>
-              <div class="col"><input name="notes" class="form-control form-control-sm" placeholder="notas"></div>
-              <div class="col-auto"><button class="btn btn-sm btn-primary">Entregar</button></div>
-            </form>
+            <button type="button" class="btn btn-sm btn-primary"
+              data-bs-toggle="modal" data-bs-target="#distributeModal"
+              data-mission-id="<?= (int)$mid ?>"
+              data-member-id="<?= (int)$mem['id'] ?>">Entregar</button>
             <?php else: ?>
             <span class="text-muted small">Sin entrega</span>
             <?php endif; ?>
@@ -408,13 +677,28 @@ if (!$jornadaTabEntregas && $jornadaTabInventory) {
 </div>
 <?php endforeach; ?>
 </div>
+<?php if ($jornadaUseTabs && $jornadaTabEntregas): ?></div><?php endif; ?>
+<?php endif; ?>
+
+<?php if ($jornadaTabPagos && $paymentsPanel): ?>
+<?php if ($jornadaUseTabs): ?><div class="tab-pane fade <?= $jornadaActiveTab === 'pagos' ? 'show active' : '' ?>" id="jornada-pane-pagos" role="tabpanel" aria-labelledby="jornada-tab-pagos" tabindex="0"><?php endif; ?>
+<?php
+extract($paymentsPanel);
+$paymentsEmbedded = true;
+$returnJornadaId = (int)$jornada['id'];
+include BASE_PATH . '/app/views/payments/_panel.php';
+?>
+<?php if ($jornadaUseTabs): ?></div><?php endif; ?>
+<?php endif; ?>
+
+<?php if ($jornadaTabProduccion): ?>
+<?php if ($jornadaUseTabs): ?><div class="tab-pane fade <?= $jornadaActiveTab === 'produccion' ? 'show active' : '' ?>" id="jornada-pane-produccion" role="tabpanel" aria-labelledby="jornada-tab-produccion" tabindex="0"><?php endif; ?>
+<?php include BASE_PATH . '/app/views/jornadas/_tab_produccion.php'; ?>
+<?php if ($jornadaUseTabs): ?></div><?php endif; ?>
 <?php endif; ?>
 
 <?php if ($jornadaTabInventory): ?>
-<?php if ($jornadaTabEntregas): ?>
-</div>
-<div class="tab-pane fade <?= $jornadaActiveTab === 'inventario' ? 'show active' : '' ?>" id="jornada-pane-inventario" role="tabpanel" aria-labelledby="jornada-tab-inventario" tabindex="0">
-<?php endif; ?>
+<?php if ($jornadaUseTabs): ?><div class="tab-pane fade <?= $jornadaActiveTab === 'inventario' ? 'show active' : '' ?>" id="jornada-pane-inventario" role="tabpanel" aria-labelledby="jornada-tab-inventario" tabindex="0"><?php endif; ?>
 <div class="card mb-3">
   <div class="card-header py-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
     <h5 class="mb-0">Entrega de ingredientes (inventario)</h5>
@@ -543,8 +827,10 @@ if (!$jornadaTabEntregas && $jornadaTabInventory) {
     <?php endif; ?>
   </div>
 </div>
-<?php if ($jornadaTabEntregas): ?>
-</div>
+<?php if ($jornadaUseTabs): ?></div><?php endif; ?>
+<?php endif; ?>
+
+<?php if ($jornadaUseTabs): ?>
 </div>
 <script>
 (function(){
@@ -553,7 +839,7 @@ if (!$jornadaTabEntregas && $jornadaTabInventory) {
   var jid = <?= (int)$jornada['id'] ?>;
   tabs.querySelectorAll('button[data-bs-toggle="tab"]').forEach(function(btn){
     btn.addEventListener('shown.bs.tab', function(){
-      var tab = btn.id === 'jornada-tab-inventario' ? 'inventario' : 'entregas';
+      var tab = btn.getAttribute('data-jornada-tab-key') || 'entregas';
       var u = new URL(window.location.href);
       u.searchParams.set('r', 'jornada_show');
       u.searchParams.set('id', String(jid));
@@ -563,7 +849,6 @@ if (!$jornadaTabEntregas && $jornadaTabInventory) {
   });
 })();
 </script>
-<?php endif; ?>
 <?php endif; ?>
 
 <script>

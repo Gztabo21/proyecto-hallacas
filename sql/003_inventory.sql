@@ -16,6 +16,9 @@ CREATE TABLE IF NOT EXISTS inventory_purchases (
   fecha DATE NOT NULL,
   tasa DECIMAL(12,4) NOT NULL,
   notes TEXT NULL,
+  es_donacion TINYINT(1) NOT NULL DEFAULT 0,
+  donante VARCHAR(160) NULL,
+  referencia VARCHAR(120) NULL,
   created_by INT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL

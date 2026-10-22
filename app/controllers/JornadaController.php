@@ -85,8 +85,11 @@ class JornadaController {
         foreach ($assigned as $jm) {
             $mid = (int)$jm['mission_id'];
             $membersByMission[(string)$mid] = array_map(
-                static fn(array $u): array => ['id' => (int)$u['id'], 'name' => (string)$u['name']],
-                User::membersOfMission($mid)
+                static fn(array $u): array => [
+                    'id' => (int)$u['id'],
+                    'name' => (string)$u['name'] . (($u['role'] ?? '') === 'coordinator' ? ' (Coordinador)' : ''),
+                ],
+                User::distributionRecipientsForMission($mid)
             );
         }
         $entregas = Entrega::allByJornada($id);
@@ -105,6 +108,36 @@ class JornadaController {
                 $jornadaInventoryBalance = InventoryMovement::balanceByJornada($id);
             } catch (PDOException $e) {
                 $inventoryTablesReady = false;
+            }
+        }
+        $jornadaTabPagos = PaymentController::canAccessPaymentsModule();
+        $paymentsPanel = null;
+        if ($jornadaTabPagos) {
+            $missionFilter = null;
+            if (Auth::isCoordinator() && !Auth::isAdmin()) {
+                $missionFilter = Auth::missionId();
+            } elseif (Auth::isAdmin() && isset($_GET['mission_id']) && $_GET['mission_id'] !== '') {
+                $missionFilter = (int)$_GET['mission_id'];
+            }
+            $paymentsPanel = PaymentController::indexData(
+                $id,
+                $missionFilter,
+                'jornada_show',
+                ['id' => $id, 'tab' => 'pagos']
+            );
+        }
+        $jornadaTabProduccion = Auth::isAdmin()
+            || (Auth::isJornadaAdmin() && in_array($id, Auth::jornadaIds(), true));
+        $produccionTablesReady = false;
+        $produccionMesas = [];
+        $produccionTotalRetirado = 0;
+        $produccionUsers = [];
+        if ($jornadaTabProduccion) {
+            $produccionTablesReady = JornadaMesa::tablesReady();
+            if ($produccionTablesReady) {
+                $produccionMesas = JornadaMesa::bundleForJornada($id);
+                $produccionTotalRetirado = JornadaMesa::totalRetiradoJornada($id);
+                $produccionUsers = User::all('', null);
             }
         }
         include BASE_PATH . '/app/views/jornadas/show.php';
@@ -231,5 +264,78 @@ class JornadaController {
         Jornada::quitarMision($jid,$mid);
         flash('success','Misión removida de la jornada');
         redirect('jornada_show', ['id'=>$jid]);
+    }
+    public static function corregirAsignacion(): void {
+        require_role('admin', 'coordinator');
+        if (!csrf_verify()) {
+            flash('error', 'CSRF inválido');
+            redirect('jornadas');
+        }
+        $jid = (int)($_POST['jornada_id'] ?? 0);
+        $mid = (int)($_POST['mission_id'] ?? 0);
+        if (!Auth::isAdmin() && Auth::missionId() !== $mid) {
+            flash('error', 'No autorizado');
+            redirect('jornada_show', ['id' => $jid]);
+            return;
+        }
+        $jornada = Jornada::find($jid);
+        if (!$jornada) {
+            flash('error', 'Jornada no encontrada');
+            redirect('jornadas');
+            return;
+        }
+        if (($jornada['status'] ?? '') !== 'open' && !Auth::isAdmin()) {
+            flash('error', 'La jornada está cerrada; solo administrador puede corregir');
+            redirect('jornada_show', ['id' => $jid]);
+            return;
+        }
+        $jmRow = null;
+        foreach (Jornada::missionsFor($jid) as $jm) {
+            if ((int)$jm['mission_id'] === $mid) {
+                $jmRow = $jm;
+                break;
+            }
+        }
+        if (!$jmRow) {
+            flash('error', 'La misión no está asignada a esta jornada');
+            redirect('jornada_show', ['id' => $jid]);
+            return;
+        }
+        $nueva = (int)($_POST['hallacas_asignadas'] ?? -1);
+        if ($nueva < 0) {
+            flash('error', 'Indique la cantidad asignada');
+            redirect('jornada_show', ['id' => $jid]);
+            return;
+        }
+        $entregadas = (int)DB::query(
+            'SELECT COALESCE(SUM(hallacas_entregadas),0) AS s FROM entregas WHERE jornada_id=? AND mission_id=?',
+            [$jid, $mid]
+        )->fetch()['s'];
+        if ($nueva < $entregadas) {
+            flash('error', 'No puede asignar menos de lo ya entregado a miembros ('.$entregadas.')');
+            redirect('jornada_show', ['id' => $jid]);
+            return;
+        }
+        $actual = (int)$jmRow['hallacas_asignadas'];
+        $totalHechas = isset($jornada['total_hallacas_hechas']) && $jornada['total_hallacas_hechas'] !== null && $jornada['total_hallacas_hechas'] !== ''
+            ? (int)$jornada['total_hallacas_hechas'] : null;
+        if ($totalHechas !== null) {
+            $nuevoTotal = Jornada::totalAsignadas($jid) - $actual + $nueva;
+            if ($nuevoTotal > $totalHechas) {
+                $max = max($entregadas, $totalHechas - (Jornada::totalAsignadas($jid) - $actual));
+                flash('error', 'Supera el total hecho de la jornada. Máximo para esta misión: '.$max);
+                redirect('jornada_show', ['id' => $jid]);
+                return;
+            }
+        }
+        $notaCorreccion = trim($_POST['correccion_nota'] ?? '');
+        $notes = trim((string)($jmRow['notes'] ?? ''));
+        if ($notaCorreccion !== '') {
+            $line = 'Corrección asignación: ' . $notaCorreccion;
+            $notes = $notes === '' ? $line : $notes . "\n" . $line;
+        }
+        Jornada::setMissionAsignadas($jid, $mid, $nueva, $notaCorreccion !== '' ? $notes : null);
+        flash('success', 'Asignación de la misión actualizada');
+        redirect('jornada_show', ['id' => $jid]);
     }
 }

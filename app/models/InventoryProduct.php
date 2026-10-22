@@ -5,9 +5,13 @@ class InventoryProduct {
     }
 
     /** Catálogo con último precio/tasa/fecha registrados en movimientos de entrada o ajuste con costo. */
-    public static function allForIndex(): array {
+    public static function allForIndex(string $sort = 'name', string $dir = 'asc'): array {
+        $sort = $sort === 'sku' ? 'sku' : 'name';
+        $dirSql = strtolower($dir) === 'desc' ? 'DESC' : 'ASC';
+        $primary = $sort === 'sku' ? 'p.sku' : 'p.name';
+        $secondary = $sort === 'sku' ? 'p.name ASC' : 'p.sku ASC';
         return DB::query(
-            'SELECT p.*,
+            "SELECT p.*,
                     lm.precio_bs AS ultimo_precio_bs,
                     lm.precio_usd AS ultimo_precio_usd,
                     lm.tasa AS ultima_tasa,
@@ -20,7 +24,7 @@ class InventoryProduct {
                ORDER BY m.fecha_ingreso DESC, m.id DESC
                LIMIT 1
              )
-             ORDER BY p.name'
+             ORDER BY {$primary} {$dirSql}, {$secondary}"
         )->fetchAll();
     }
 

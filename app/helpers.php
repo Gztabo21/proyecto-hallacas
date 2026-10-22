@@ -107,6 +107,15 @@ function role_label(string $role): string {
     return app_roles()[$role] ?? $role;
 }
 
+function payment_requires_referencia(string $metodo): bool {
+    $m = mb_strtolower(trim($metodo), 'UTF-8');
+    if ($m === '') {
+        return false;
+    }
+    return (str_contains($m, 'movil') || str_contains($m, 'móvil'))
+        && str_contains($m, 'pago');
+}
+
 function payment_methods(): array {
     $raw = setting('payment_methods', null);
     $res = [];

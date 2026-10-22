@@ -13,6 +13,8 @@ require_once __DIR__ . '/../app/controllers/DistributionController.php';
 require_once __DIR__ . '/../app/controllers/ReportController.php';
 require_once __DIR__ . '/../app/controllers/PaymentController.php';
 require_once __DIR__ . '/../app/controllers/InventoryController.php';
+require_once __DIR__ . '/../app/controllers/RolePermissionController.php';
+require_once __DIR__ . '/../app/controllers/ProductionController.php';
 
 $route = $_GET['r'] ?? '';
 
@@ -144,14 +146,41 @@ switch ($route) {
     case 'jornada_quitar':
         JornadaController::quitar();
         break;
+    case 'jornada_corregir_asignacion':
+        JornadaController::corregirAsignacion();
+        break;
+    case 'jornada_mesa_store':
+        ProductionController::storeMesa();
+        break;
+    case 'jornada_mesa_delete':
+        ProductionController::deleteMesa();
+        break;
+    case 'jornada_mesa_persona_store':
+        ProductionController::storePersona();
+        break;
+    case 'jornada_mesa_persona_delete':
+        ProductionController::deletePersona();
+        break;
+    case 'jornada_mesa_retiro_store':
+        ProductionController::storeRetiro();
+        break;
+    case 'jornada_mesa_retiro_delete':
+        ProductionController::deleteRetiro();
+        break;
     case 'entrega_store':
         DistributionController::storeEntrega();
+        break;
+    case 'distribution_quick_member':
+        DistributionController::quickAddRecipient();
         break;
     case 'entrega_abono':
         DistributionController::abono();
         break;
     case 'entrega_delete':
         DistributionController::deleteEntrega();
+        break;
+    case 'entrega_correct':
+        DistributionController::correctEntrega();
         break;
     case 'payments':
         PaymentController::index();
@@ -161,6 +190,27 @@ switch ($route) {
         break;
     case 'payment_confirm':
         PaymentController::confirm();
+        break;
+    case 'payment_delete':
+        PaymentController::delete();
+        break;
+    case 'payment_show':
+        PaymentController::show();
+        break;
+    case 'payment_edit':
+        PaymentController::edit();
+        break;
+    case 'payment_update':
+        PaymentController::update();
+        break;
+    case 'payment_captura':
+        PaymentController::captura();
+        break;
+    case 'role_permissions':
+        RolePermissionController::index();
+        break;
+    case 'role_permissions_update':
+        RolePermissionController::update();
         break;
     case 'reports':
         ReportController::index();

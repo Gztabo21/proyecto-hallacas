@@ -43,6 +43,15 @@ class Jornada {
         DB::query('INSERT INTO jornada_mision (jornada_id,mission_id,hallacas_asignadas,notes) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE hallacas_asignadas=hallacas_asignadas+VALUES(hallacas_asignadas), notes=VALUES(notes)',
             [$jornadaId,$missionId,$hallacas,$notes]);
     }
+    public static function setMissionAsignadas(int $jornadaId, int $missionId, int $hallacas, ?string $notes = null): void {
+        if ($notes !== null) {
+            DB::query('UPDATE jornada_mision SET hallacas_asignadas=?, notes=? WHERE jornada_id=? AND mission_id=?',
+                [$hallacas, $notes, $jornadaId, $missionId]);
+        } else {
+            DB::query('UPDATE jornada_mision SET hallacas_asignadas=? WHERE jornada_id=? AND mission_id=?',
+                [$hallacas, $jornadaId, $missionId]);
+        }
+    }
     public static function quitarMision(int $jornadaId, int $missionId): void {
         DB::query('DELETE FROM jornada_mision WHERE jornada_id=? AND mission_id=?', [$jornadaId,$missionId]);
         DB::query('DELETE FROM entregas WHERE jornada_id=? AND mission_id=?', [$jornadaId,$missionId]);
