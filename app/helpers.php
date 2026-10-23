@@ -57,7 +57,7 @@ function setting(string $key, $default = null) {
     return array_key_exists($key, $cache) ? $cache[$key] : $default;
 }
 function set_setting(string $key, string $value): void {
-    DB::query('INSERT INTO settings (`key`,`value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)', [$key,$value]);
+    DB::query('INSERT INTO settings (`key`,`value`) VALUES (?,?) AS s ON DUPLICATE KEY UPDATE `value`=s.`value`', [$key,$value]);
 }
 function price_for_jornada(array $jornada): float {
     $p = (float)($jornada['precio_hallaca'] ?? 0);

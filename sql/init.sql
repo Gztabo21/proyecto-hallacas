@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS settings (
 INSERT INTO settings (`key`,`value`) VALUES
   ('precio_hallaca','1.00'),
   ('app_name','Hallacas Jireh')
-ON DUPLICATE KEY UPDATE `value` = VALUES(`value`);
+AS s
+ON DUPLICATE KEY UPDATE `value` = s.`value`;
 
 CREATE TABLE IF NOT EXISTS missions (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -171,7 +172,8 @@ CREATE TABLE IF NOT EXISTS inventory_movements (
 INSERT INTO missions (id, name, code, description, status) VALUES
   (1,'Mision Centro','MC','Mision encargada del centro de la ciudad','active'),
   (2,'Mision Norte','MN','Mision zona norte','active')
-ON DUPLICATE KEY UPDATE name=VALUES(name);
+AS m
+ON DUPLICATE KEY UPDATE name = m.name;
 
 INSERT INTO users (id, name, email, password_hash, role, mission_id, status) VALUES
   (1,'Administrador','admin@jireh.local','$2y$10$5s4AbW7m0fY1QumaMlTFS.K2e62Kd0uw6orOxJjAo.FwXaagivqf6','admin',NULL,'active'),
@@ -180,7 +182,8 @@ INSERT INTO users (id, name, email, password_hash, role, mission_id, status) VAL
   (4,'Miembro Ana','ana@jireh.local','$2y$10$rs38E5Aj5BXJaJCs0mRPyOJ8Rjgq1oJj7/aH5WgZQxoIL8qfU/QGO','member',1,'active'),
   (5,'Miembro Luis','luis@jireh.local','$2y$10$rs38E5Aj5BXJaJCs0mRPyOJ8Rjgq1oJj7/aH5WgZQxoIL8qfU/QGO','member',1,'active'),
   (6,'Miembro Maria','maria@jireh.local','$2y$10$rs38E5Aj5BXJaJCs0mRPyOJ8Rjgq1oJj7/aH5WgZQxoIL8qfU/QGO','member',2,'active')
-ON DUPLICATE KEY UPDATE name=VALUES(name);
+AS u
+ON DUPLICATE KEY UPDATE name = u.name;
 
 UPDATE missions SET coordinator_id=2 WHERE id=1;
 UPDATE missions SET coordinator_id=3 WHERE id=2;

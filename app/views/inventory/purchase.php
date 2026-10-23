@@ -11,7 +11,7 @@ page_back('inventory', 'Volver al inventario');
       <input type="date" name="fecha" class="form-control" required value="<?= date('Y-m-d') ?>">
     </div>
     <div class="col-md-4">
-      <label class="form-label">Tasa del día (Bs/USD)</label>
+      <label class="form-label">Tasa del día (Bs/USD) <span class="text-muted small fw-normal" id="tasaOptionalHint">(opcional en donación)</span></label>
       <input type="number" step="0.0001" min="0.0001" name="tasa" id="purchaseTasa" class="form-control" required>
     </div>
     <div class="col-md-4">
@@ -107,6 +107,16 @@ page_back('inventory', 'Volver al inventario');
       donanteInput.required = show;
       if (!show) donanteInput.value = '';
     }
+    if (tasaEl) {
+      tasaEl.required = !show;
+      if (show) {
+        tasaEl.removeAttribute('min');
+      } else {
+        tasaEl.min = '0.0001';
+      }
+    }
+    var hint = document.getElementById('tasaOptionalHint');
+    if (hint) hint.classList.toggle('d-none', !show);
   }
   if (donEl) {
     donEl.addEventListener('change', toggleDonante);

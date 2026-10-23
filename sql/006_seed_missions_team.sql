@@ -23,7 +23,8 @@ INSERT INTO missions (name, code, description, status) VALUES
 ('Misión 14', 'M14', 'Misión 14', 'active'),
 ('Misión 15', 'M15', 'Misión 15', 'active'),
 ('Misión 16', 'M16', 'Misión 16', 'active')
-ON DUPLICATE KEY UPDATE name = VALUES(name), status = VALUES(status);
+AS m
+ON DUPLICATE KEY UPDATE name = m.name, status = m.status;
 
 INSERT INTO users (name, email, password_hash, role, mission_id, status) VALUES
 ('Coordinador Misión 1', 'coord.m01@jireh.local', @pwd, 'coordinator', (SELECT id FROM missions WHERE code='M01' LIMIT 1), 'active'),
@@ -42,7 +43,8 @@ INSERT INTO users (name, email, password_hash, role, mission_id, status) VALUES
 ('Coordinador Misión 14', 'coord.m14@jireh.local', @pwd, 'coordinator', (SELECT id FROM missions WHERE code='M14' LIMIT 1), 'active'),
 ('Coordinador Misión 15', 'coord.m15@jireh.local', @pwd, 'coordinator', (SELECT id FROM missions WHERE code='M15' LIMIT 1), 'active'),
 ('Coordinador Misión 16', 'coord.m16@jireh.local', @pwd, 'coordinator', (SELECT id FROM missions WHERE code='M16' LIMIT 1), 'active')
-ON DUPLICATE KEY UPDATE name = VALUES(name), role = VALUES(role), mission_id = VALUES(mission_id), status = VALUES(status);
+AS u
+ON DUPLICATE KEY UPDATE name = u.name, role = u.role, mission_id = u.mission_id, status = u.status;
 
 UPDATE missions SET coordinator_id = (SELECT id FROM users WHERE email = 'coord.m01@jireh.local' LIMIT 1) WHERE code = 'M01';
 UPDATE missions SET coordinator_id = (SELECT id FROM users WHERE email = 'coord.m02@jireh.local' LIMIT 1) WHERE code = 'M02';
@@ -74,9 +76,11 @@ INSERT INTO users (name, email, password_hash, role, mission_id, status) VALUES
 ('Admin jornada 10', 'jornada.admin10@jireh.local', @pwd, 'jornada_admin', NULL, 'active'),
 ('Admin jornada 11', 'jornada.admin11@jireh.local', @pwd, 'jornada_admin', NULL, 'active'),
 ('Admin jornada 12', 'jornada.admin12@jireh.local', @pwd, 'jornada_admin', NULL, 'active')
-ON DUPLICATE KEY UPDATE name = VALUES(name), role = VALUES(role), status = VALUES(status);
+AS u
+ON DUPLICATE KEY UPDATE name = u.name, role = u.role, status = u.status;
 
 INSERT INTO users (name, email, password_hash, role, mission_id, status) VALUES
 ('Administrador de compras', 'admin.compras@jireh.local', @pwd, 'purchase_admin', NULL, 'active'),
 ('Coordinador de compras', 'coord.compras@jireh.local', @pwd, 'purchase_coordinator', NULL, 'active')
-ON DUPLICATE KEY UPDATE name = VALUES(name), role = VALUES(role), status = VALUES(status);
+AS u
+ON DUPLICATE KEY UPDATE name = u.name, role = u.role, status = u.status;

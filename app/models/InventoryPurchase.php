@@ -27,7 +27,7 @@ class InventoryPurchase {
                     'tipo' => 'compra',
                     'cantidad' => (float)$line['cantidad'],
                     'precio_bs' => $precioBs > 0 ? $precioBs : null,
-                    'tasa' => (float)$header['tasa'],
+                    'tasa' => isset($header['tasa']) && (float)$header['tasa'] > 0 ? (float)$header['tasa'] : null,
                     'fecha_ingreso' => $header['fecha'],
                     'purchase_id' => $purchaseId,
                     'notes' => $movNotes,

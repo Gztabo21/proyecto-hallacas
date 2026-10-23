@@ -122,8 +122,8 @@ class RolePermission {
                     $e = !empty($row['edit']) ? 1 : 0;
                     $d = !empty($row['delete']) ? 1 : 0;
                     DB::query(
-                        'INSERT INTO role_permissions (role, resource, can_create, can_edit, can_delete) VALUES (?,?,?,?,?)
-                         ON DUPLICATE KEY UPDATE can_create=VALUES(can_create), can_edit=VALUES(can_edit), can_delete=VALUES(can_delete)',
+                        'INSERT INTO role_permissions (role, resource, can_create, can_edit, can_delete) VALUES (?,?,?,?,?) AS rp
+                         ON DUPLICATE KEY UPDATE can_create=rp.can_create, can_edit=rp.can_edit, can_delete=rp.can_delete',
                         [$role, $resource, $c, $e, $d]
                     );
                 }

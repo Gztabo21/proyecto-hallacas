@@ -306,10 +306,13 @@ class InventoryController {
             redirect('inventory_purchase');
             return;
         }
-        if ($tasa <= 0) {
+        if (!$esDonacion && $tasa <= 0) {
             flash('error', 'Indique la tasa del día de compra');
             redirect('inventory_purchase');
             return;
+        }
+        if ($esDonacion && $tasa <= 0) {
+            $tasa = 0;
         }
         $lines = self::parsePurchaseLines($_POST);
         if (!$lines) {
