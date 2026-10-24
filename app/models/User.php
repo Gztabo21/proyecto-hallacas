@@ -1,5 +1,25 @@
 <?php
 class User {
+    public static function ensureEmailNullable(): void {
+        static $checked = false;
+        if ($checked) {
+            return;
+        }
+        $checked = true;
+        try {
+            $row = DB::query("SHOW COLUMNS FROM users LIKE 'email'")->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException) {
+            return;
+        }
+        if (!$row) {
+            return;
+        }
+        if (stripos((string)($row['Null'] ?? ''), 'YES') === 0) {
+            return;
+        }
+        DB::query('ALTER TABLE users MODIFY email VARCHAR(190) NULL');
+    }
+
     public static function all(string $role = '', ?int $missionId = null): array {
         $sql = 'SELECT u.*, m.name AS mission_name, (SELECT GROUP_CONCAT(j.name SEPARATOR ", ") FROM user_jornada uj JOIN jornadas j ON j.id=uj.jornada_id WHERE uj.user_id=u.id) AS jornada_name FROM users u LEFT JOIN missions m ON m.id=u.mission_id WHERE 1=1';
         $p = [];
@@ -14,9 +34,67 @@ class User {
         return $r ?: null;
     }
     public static function findByEmail(string $email): ?array {
+        $email = trim($email);
+        if ($email === '') {
+            return null;
+        }
         $stmt = DB::query('SELECT * FROM users WHERE email = ?', [$email]);
         $r = $stmt->fetch();
         return $r ?: null;
+    }
+
+    public static function findMemberByNameInMission(int $missionId, string $name): ?array {
+        $name = trim($name);
+        if ($name === '') {
+            return null;
+        }
+        $stmt = DB::query(
+            'SELECT * FROM users WHERE role = ? AND mission_id = ? AND LOWER(TRIM(name)) = LOWER(?) LIMIT 1',
+            ['member', $missionId, $name]
+        );
+        $r = $stmt->fetch();
+        return $r ?: null;
+    }
+
+    /** Crea o reutiliza miembro para distribución (correo opcional). */
+    public static function ensureMemberForDistribution(string $name, int $missionId, ?string $email = null): int {
+        $name = trim($name);
+        if ($name === '') {
+            throw new InvalidArgumentException('Nombre de miembro vacío');
+        }
+        $email = $email !== null ? trim($email) : '';
+        if ($email !== '') {
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                throw new InvalidArgumentException('Correo inválido: ' . $email);
+            }
+            $byEmail = self::findByEmail($email);
+            if ($byEmail) {
+                if (($byEmail['role'] ?? '') !== 'member') {
+                    throw new InvalidArgumentException('El correo ya existe con otro rol');
+                }
+                if ((int)($byEmail['mission_id'] ?? 0) !== $missionId) {
+                    self::update((int)$byEmail['id'], ['mission_id' => $missionId, 'name' => $name]);
+                }
+                return (int)$byEmail['id'];
+            }
+        }
+        $existing = self::findMemberByNameInMission($missionId, $name);
+        if ($existing) {
+            if ($email !== '' && ($existing['email'] ?? '') === '') {
+                self::update((int)$existing['id'], ['email' => $email]);
+            }
+            return (int)$existing['id'];
+        }
+        return self::create([
+            'name' => $name,
+            'email' => $email !== '' ? $email : null,
+            'password_hash' => password_hash(bin2hex(random_bytes(8)), PASSWORD_DEFAULT),
+            'role' => 'member',
+            'mission_id' => $missionId,
+            'jornada_id' => null,
+            'phone' => null,
+            'status' => 'active',
+        ]);
     }
     public static function create(array $data): int {
         DB::query(

@@ -61,16 +61,32 @@ class MemberController {
         $name = trim($_POST['name'] ?? '');
         $email = trim($_POST['email'] ?? '');
         $password = $_POST['password'] ?? '';
-        if ($name === '' || $email === '' || $password === '') {
-            flash('error', 'Nombre, correo y contraseña son obligatorios');
+        if ($name === '') {
+            flash('error', 'El nombre es obligatorio');
             redirect('member_create');
             return;
         }
-        if (User::findByEmail($email)) {
-            flash('error', 'Ya existe un usuario con ese correo');
+        if ($email !== '') {
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                flash('error', 'Correo inválido');
+                redirect('member_create');
+                return;
+            }
+            if (User::findByEmail($email)) {
+                flash('error', 'Ya existe un usuario con ese correo');
+                redirect('member_create');
+                return;
+            }
+        }
+        if ($email === '' && $password === '') {
+            $password = bin2hex(random_bytes(4));
+        }
+        if ($password === '') {
+            flash('error', 'Indique contraseña o deje el correo vacío para generar una automática');
             redirect('member_create');
             return;
         }
+        User::ensureEmailNullable();
         if (Auth::isAdmin()) {
             $missionId = !empty($_POST['mission_id']) ? (int)$_POST['mission_id'] : null;
             if (!$missionId) {
@@ -83,7 +99,7 @@ class MemberController {
         }
         User::create([
             'name' => $name,
-            'email' => $email,
+            'email' => $email !== '' ? $email : null,
             'password_hash' => password_hash($password, PASSWORD_DEFAULT),
             'role' => 'member',
             'mission_id' => $missionId,
@@ -91,7 +107,7 @@ class MemberController {
             'phone' => trim($_POST['phone'] ?? ''),
             'status' => $_POST['status'] ?? 'active',
         ]);
-        flash('success', 'Miembro creado');
+        flash('success', $email === '' ? 'Miembro creado (sin correo; no podrá iniciar sesión)' : 'Miembro creado');
         redirect('members');
     }
 
@@ -126,12 +142,18 @@ class MemberController {
 
         $email = trim($_POST['email'] ?? '');
         $name = trim($_POST['name'] ?? '');
-        if ($name === '' || $email === '') {
-            flash('error', 'Nombre y correo son obligatorios');
+        if ($name === '') {
+            flash('error', 'El nombre es obligatorio');
             redirect('member_edit', ['id' => $id]);
             return;
         }
-        $existing = User::findByEmail($email);
+        User::ensureEmailNullable();
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            flash('error', 'Correo inválido');
+            redirect('member_edit', ['id' => $id]);
+            return;
+        }
+        $existing = $email !== '' ? User::findByEmail($email) : null;
         if ($existing && (int)$existing['id'] !== $id) {
             flash('error', 'Ya existe otro usuario con ese correo');
             redirect('member_edit', ['id' => $id]);
@@ -151,7 +173,7 @@ class MemberController {
 
         $data = [
             'name' => $name,
-            'email' => $email,
+            'email' => $email !== '' ? $email : null,
             'phone' => trim($_POST['phone'] ?? ''),
             'status' => $_POST['status'] ?? 'active',
             'mission_id' => $missionId,
@@ -227,12 +249,13 @@ class MemberController {
             'password' => csv_column_index($header, 'password', ['contraseña', 'contrasena', 'clave']),
             'estado' => csv_column_index($header, 'estado', ['status', 'activo']),
         ];
-        if ($idx['nombre'] === false || $idx['email'] === false) {
+        if ($idx['nombre'] === false) {
             $found = implode(', ', array_filter($header, fn($h) => $h !== ''));
-            flash('error', 'El archivo debe incluir columnas nombre y email. Detectado: ' . ($found !== '' ? $found : '(ninguno)'));
+            flash('error', 'El archivo debe incluir columna nombre. Detectado: ' . ($found !== '' ? $found : '(ninguno)'));
             redirect('member_import');
             return;
         }
+        User::ensureEmailNullable();
         if (Auth::isAdmin() && $idx['mision'] === false) {
             flash('error', 'Como administrador debe incluir la columna mision (código M01, nombre o número de misión).');
             redirect('member_import');
@@ -263,11 +286,11 @@ class MemberController {
             $status = in_array($statusRaw, ['active', 'inactive', 'activo', 'inactivo', '1', '0'], true)
                 ? (in_array($statusRaw, ['inactive', 'inactivo', '0'], true) ? 'inactive' : 'active')
                 : 'active';
-            if ($name === '' || $email === '') {
-                $errors[] = "Línea $lineNum: nombre y email obligatorios";
+            if ($name === '') {
+                $errors[] = "Línea $lineNum: nombre obligatorio";
                 continue;
             }
-            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 $errors[] = "Línea $lineNum: correo inválido ($email)";
                 continue;
             }
@@ -292,7 +315,11 @@ class MemberController {
                 $errors[] = "Línea $lineNum: contraseña demasiado corta";
                 continue;
             }
-            $existing = User::findByEmail($email);
+            if ($email !== '') {
+                $existing = User::findByEmail($email);
+            } else {
+                $existing = User::findMemberByNameInMission($missionId, $name);
+            }
             if ($existing) {
                 if (($existing['role'] ?? '') !== 'member') {
                     $errors[] = "Línea $lineNum: el correo ya existe con otro rol";
@@ -300,7 +327,7 @@ class MemberController {
                 }
                 User::update((int)$existing['id'], [
                     'name' => $name,
-                    'email' => $email,
+                    'email' => $email !== '' ? $email : ($existing['email'] ?? null),
                     'phone' => $phone !== '' ? $phone : null,
                     'mission_id' => $missionId,
                     'status' => $status,
@@ -311,7 +338,7 @@ class MemberController {
             } else {
                 User::create([
                     'name' => $name,
-                    'email' => $email,
+                    'email' => $email !== '' ? $email : null,
                     'password_hash' => password_hash($password, PASSWORD_DEFAULT),
                     'role' => 'member',
                     'mission_id' => $missionId,

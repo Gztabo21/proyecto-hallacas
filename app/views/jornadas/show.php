@@ -129,7 +129,28 @@ $jornadaUseTabs = count($jornadaTabLabels) > 1;
 </div>
 <?php endif; ?>
 <?php if (Auth::isAdmin() || Auth::isCoordinator() || Auth::isJornadaAdmin()): ?>
+<button type="button" class="btn btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#importEntregasPanel" aria-expanded="false">Importar distribución (CSV)</button>
 <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#distributeModal">Distribuir hallacas</button>
+<div class="collapse w-100 mt-2" id="importEntregasPanel">
+  <div class="card card-body shadow-sm">
+    <p class="small text-muted mb-2">Columnas: <code>mision;miembro;hallacas;email</code> (correo opcional). Crea miembros si no existen y registra entregas. Ajusta el cupo de cada misión en la jornada si hace falta.</p>
+    <form method="post" action="<?= url('entrega_import_store') ?>" enctype="multipart/form-data" class="row g-2 align-items-end">
+      <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
+      <input type="hidden" name="jornada_id" value="<?= (int)$jornada['id'] ?>">
+      <div class="col-md-6">
+        <label class="form-label">Archivo CSV</label>
+        <input type="file" name="csv" class="form-control form-control-sm" accept=".csv,text/csv" required>
+      </div>
+      <div class="col-md-6 d-flex flex-wrap gap-2">
+        <button class="btn btn-primary btn-sm">Importar</button>
+        <a class="btn btn-outline-secondary btn-sm" href="<?= url('entrega_import_template', ['jornada_id' => (int)$jornada['id']]) ?>">Plantilla</a>
+        <?php if (is_readable(BASE_PATH . '/data/jornada-' . (int)$jornada['id'] . '-distribucion.csv')): ?>
+        <a class="btn btn-outline-secondary btn-sm" href="<?= url('entrega_import_example', ['jornada_id' => (int)$jornada['id']]) ?>">Descargar datos jornada <?= (int)$jornada['id'] ?></a>
+        <?php endif; ?>
+      </div>
+    </form>
+  </div>
+</div>
 <div class="modal fade" id="distributeModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <form method="post" action="<?= url('entrega_store') ?>" class="modal-content">

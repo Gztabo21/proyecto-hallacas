@@ -6,22 +6,47 @@ $preserve = array_merge($pagination['filters'], pagination_preserve($pagination[
 $pdfParams = array_filter([
     'product_id' => isset($_GET['product_id']) && $_GET['product_id'] !== '' ? (int)$_GET['product_id'] : null,
     'jornada_id' => isset($_GET['jornada_id']) && $_GET['jornada_id'] !== '' ? (int)$_GET['jornada_id'] : null,
+    'purchase_id' => isset($_GET['purchase_id']) && $_GET['purchase_id'] !== '' ? (int)$_GET['purchase_id'] : null,
 ], fn($v) => $v !== null);
+$jornadas = $jornadas ?? [];
 ?>
 <div class="d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center gap-2 mb-2">
   <h2 class="mb-0">Historial de movimientos</h2>
-  <a class="btn btn-outline-danger btn-sm" href="<?= url('inventory_movements_pdf', $pdfParams) ?>">Descargar PDF</a>
+  <div class="d-flex flex-wrap gap-2">
+    <?php if (!empty($_GET['purchase_id'])): ?>
+    <a class="btn btn-outline-secondary btn-sm" href="<?= url('inventory_purchases') ?>">Compras y donaciones</a>
+    <?php endif; ?>
+    <a class="btn btn-outline-danger btn-sm" href="<?= url('inventory_movements_pdf', $pdfParams) ?>">Descargar PDF</a>
+  </div>
 </div>
+<?php if (!empty($_GET['purchase_id'])): ?>
+<p class="alert alert-light border py-2 small mb-2">Mostrando líneas de la compra/donación #<?= (int)$_GET['purchase_id'] ?>.</p>
+<?php endif; ?>
 <p class="text-muted small">En salidas y ajustes de cantidad a veces no hay precio en el movimiento; se muestra el último costo del producto marcado como <em>ref.</em></p>
 <form method="get" action="<?= url('inventory_movements') ?>" class="card p-3 mb-3">
   <input type="hidden" name="r" value="inventory_movements">
+  <?php if (!empty($_GET['purchase_id'])): ?>
+  <input type="hidden" name="purchase_id" value="<?= (int)$_GET['purchase_id'] ?>">
+  <?php endif; ?>
+  <?php
+  $selectedJornadaId = isset($_GET['jornada_id']) && $_GET['jornada_id'] !== '' ? (int)$_GET['jornada_id'] : 0;
+  ?>
   <div class="row g-2 align-items-end">
     <div class="col-md-4">
-      <label class="form-label">Producto</label>
-      <select name="product_id" class="form-select">
-        <option value="">Todos</option>
+      <label class="form-label" for="productFilterSelect">Producto</label>
+      <select name="product_id" id="productFilterSelect" class="form-select">
+        <option value=""></option>
         <?php foreach ($products as $p): ?>
         <option value="<?= (int)$p['id'] ?>" <?= (isset($_GET['product_id']) && (int)$_GET['product_id'] === (int)$p['id']) ? 'selected' : '' ?>><?= h($p['name']) ?></option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label" for="jornadaFilterSelect">Jornada</label>
+      <select name="jornada_id" id="jornadaFilterSelect" class="form-select">
+        <option value=""></option>
+        <?php foreach ($jornadas as $j): ?>
+        <option value="<?= (int)$j['id'] ?>" <?= $selectedJornadaId === (int)$j['id'] ? 'selected' : '' ?>><?= h($j['name'] . ' (' . $j['fecha'] . ')') ?></option>
         <?php endforeach; ?>
       </select>
     </div>
@@ -35,19 +60,32 @@ $pdfParams = array_filter([
   <thead>
     <tr>
       <th>Fecha</th><th>Tipo</th><th>Producto</th><th>SKU</th><th>Cant.</th><th>Unidad</th>
-      <th>Precio Bs</th><th>Precio USD</th><th>Tasa</th><th>Jornada</th><th>Registrado por</th>
+      <th class="text-end">Precio Bs</th><th class="text-end">Total (Bs)</th><th class="text-end">Precio USD</th><th class="text-end">Tasa</th><th>Jornada</th><th>Registrado por</th>
     </tr>
   </thead>
   <tbody>
+  <?php
+  $totDeltaCant = 0.0;
+  $totLineBs = 0.0;
+  $totLineUsd = 0.0;
+  $totHasUsd = false;
+  ?>
   <?php if (empty($movements)): ?>
-  <tr><td colspan="11" class="text-center text-muted py-3">Sin movimientos</td></tr>
+  <tr><td colspan="12" class="text-center text-muted py-3">Sin movimientos</td></tr>
   <?php else: foreach ($movements as $m):
     $delta = InventoryMovement::deltaForTipo($m['tipo'], (float)$m['cantidad']);
     $sign = $delta >= 0 ? '+' : '−';
+    $totDeltaCant += $delta;
+    $lineTotals = InventoryMovement::lineTotalAmounts($m, $refCostByProduct);
+    $totLineBs += $lineTotals['bs'];
+    if ($lineTotals['usd'] > 0) {
+      $totLineUsd += $lineTotals['usd'];
+      $totHasUsd = true;
+    }
   ?>
   <tr>
     <td><?= h($m['fecha_ingreso']) ?></td>
-    <td><?= h(InventoryMovement::tipoLabel($m['tipo'])) ?></td>
+    <td><?= h(InventoryMovement::tipoLabelForMovement($m)) ?></td>
     <td><?= h($m['product_name']) ?></td>
     <td><code><?= h($m['sku']) ?></code></td>
     <td><?= $sign ?><?= h(rtrim(rtrim(number_format((float)$m['cantidad'], 3, '.', ''), '0'), '.')) ?></td>
@@ -58,6 +96,19 @@ $pdfParams = array_filter([
   </tr>
   <?php endforeach; endif; ?>
   </tbody>
+  <?php if (!empty($movements)): ?>
+  <tfoot class="table-light fw-semibold">
+    <tr>
+      <td colspan="4" class="text-end">Totales (página)</td>
+      <td class="text-end"><?= ($totDeltaCant >= 0 ? '+' : '−') . h(rtrim(rtrim(number_format(abs($totDeltaCant), 3, '.', ''), '0'), '.')) ?></td>
+      <td></td>
+      <td></td>
+      <td class="text-end"><?= $totLineBs > 0 ? money($totLineBs) : 'n/d' ?></td>
+      <td class="text-end"><?= $totHasUsd ? money($totLineUsd) : 'n/d' ?></td>
+      <td colspan="3"></td>
+    </tr>
+  </tfoot>
+  <?php endif; ?>
 </table>
 </div>
 <?= pagination_render(
@@ -68,4 +119,37 @@ $pdfParams = array_filter([
     $pagination['list']['param'],
     $preserve
 ) ?>
-<?php include BASE_PATH . '/app/views/partials/footer.php'; ?>
+<?php ob_start(); ?>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/css/select2.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet">
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
+<script>
+jQuery(function($) {
+  if (!$.fn.select2) {
+    return;
+  }
+  var select2Lang = {
+    noResults: function() { return 'Sin coincidencias'; },
+    searching: function() { return 'Buscando…'; }
+  };
+  function initMovementFilterSelect(selector, placeholder) {
+    var $el = $(selector);
+    if (!$el.length) {
+      return;
+    }
+    $el.select2({
+      theme: 'bootstrap-5',
+      width: '100%',
+      placeholder: placeholder,
+      allowClear: true,
+      language: select2Lang
+    });
+  }
+  initMovementFilterSelect('#productFilterSelect', 'Todos los productos');
+  initMovementFilterSelect('#jornadaFilterSelect', 'Todas las jornadas');
+});
+</script>
+<?php
+$extraFooterScripts = ob_get_clean();
+include BASE_PATH . '/app/views/partials/footer.php';

@@ -24,19 +24,19 @@
   <thead>
     <tr>
       <th>Fecha</th><th>Tipo</th><th>Producto</th><th>SKU</th><th class="num">Cant.</th><th>Unidad</th>
-      <th class="num">Precio Bs</th><th class="num">USD</th><th class="num">Tasa</th><th>Jornada</th><th>Registrado por</th>
+      <th class="num">Precio Bs</th><th class="num">Total (Bs)</th><th class="num">USD</th><th class="num">Tasa</th><th>Jornada</th><th>Registrado por</th>
     </tr>
   </thead>
   <tbody>
   <?php if (empty($movements)): ?>
-  <tr><td colspan="11">Sin movimientos</td></tr>
+  <tr><td colspan="12">Sin movimientos</td></tr>
   <?php else: foreach ($movements as $m):
     $delta = InventoryMovement::deltaForTipo($m['tipo'], (float)$m['cantidad']);
     $sign = $delta >= 0 ? '+' : '−';
   ?>
   <tr>
     <td><?= h($m['fecha_ingreso']) ?></td>
-    <td><?= h(InventoryMovement::tipoLabel($m['tipo'])) ?></td>
+    <td><?= h(InventoryMovement::tipoLabelForMovement($m)) ?></td>
     <td><?= h($m['product_name']) ?></td>
     <td><?= h($m['sku']) ?></td>
     <td class="num"><?= $sign ?><?= h(rtrim(rtrim(number_format((float)$m['cantidad'], 3, '.', ''), '0'), '.')) ?></td>

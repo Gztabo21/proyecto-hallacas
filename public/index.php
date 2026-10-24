@@ -170,6 +170,15 @@ switch ($route) {
     case 'entrega_store':
         DistributionController::storeEntrega();
         break;
+    case 'entrega_import_template':
+        DistributionController::importEntregasTemplate();
+        break;
+    case 'entrega_import_example':
+        DistributionController::importEntregasExample();
+        break;
+    case 'entrega_import_store':
+        DistributionController::importEntregasStore();
+        break;
     case 'distribution_quick_member':
         DistributionController::quickAddRecipient();
         break;
@@ -248,6 +257,18 @@ switch ($route) {
     case 'inventory_initial_store':
         InventoryController::initialStockStore();
         break;
+    case 'inventory_purchases':
+        InventoryController::purchasesIndex();
+        break;
+    case 'inventory_purchase_json':
+        InventoryController::purchaseJson();
+        break;
+    case 'inventory_purchase_update':
+        InventoryController::purchaseUpdateStore();
+        break;
+    case 'inventory_purchase_delete':
+        InventoryController::purchaseDeleteStore();
+        break;
     case 'inventory_purchase':
         InventoryController::purchaseForm();
         break;
@@ -271,6 +292,12 @@ switch ($route) {
         break;
     case 'inventory_import_store':
         InventoryController::importStore();
+        break;
+    case 'inventory_purchase_donations_template':
+        InventoryController::purchaseDonationsTemplate();
+        break;
+    case 'inventory_purchase_donations_import':
+        InventoryController::purchaseDonationsImportStore();
         break;
     default:
         http_response_code(404);

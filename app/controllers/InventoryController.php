@@ -35,12 +35,45 @@ class InventoryController {
         }
         try {
             DB::query('SELECT 1 FROM inventory_products LIMIT 1');
+            self::ensurePurchaseColumns();
             $ready = true;
             return true;
         } catch (PDOException $e) {
             $ready = false;
             include BASE_PATH . '/app/views/inventory/setup_required.php';
             return false;
+        }
+    }
+
+    private static function ensurePurchaseColumns(): void {
+        static $checked = false;
+        if ($checked) {
+            return;
+        }
+        $checked = true;
+        try {
+            $rows = DB::query('SHOW COLUMNS FROM inventory_purchases')->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException) {
+            return;
+        }
+        $cols = [];
+        foreach ($rows as $row) {
+            $cols[strtolower((string)$row['Field'])] = true;
+        }
+        if (!isset($cols['es_donacion'])) {
+            DB::query(
+                'ALTER TABLE inventory_purchases ADD COLUMN es_donacion TINYINT(1) NOT NULL DEFAULT 0'
+            );
+        }
+        if (!isset($cols['donante'])) {
+            DB::query(
+                'ALTER TABLE inventory_purchases ADD COLUMN donante VARCHAR(160) NULL'
+            );
+        }
+        if (!isset($cols['referencia'])) {
+            DB::query(
+                'ALTER TABLE inventory_purchases ADD COLUMN referencia VARCHAR(120) NULL'
+            );
         }
     }
 
@@ -72,18 +105,18 @@ class InventoryController {
         if (!self::ensureTables()) {
             return;
         }
-        $filters = [];
-        if (!empty($_GET['product_id'])) {
-            $filters['product_id'] = (int)$_GET['product_id'];
-        }
-        if (!empty($_GET['jornada_id'])) {
-            $filters['jornada_id'] = (int)$_GET['jornada_id'];
-        }
+        $filters = self::movementFiltersFromRequest();
+        $filters = array_filter([
+            'product_id' => $filters['product_id'] ?? null,
+            'jornada_id' => $filters['jornada_id'] ?? null,
+            'purchase_id' => $filters['purchase_id'] ?? null,
+        ], static fn($v) => $v !== null && $v !== '');
         $page = pagination_page('p');
         $per = 25;
         $total = InventoryMovement::count($filters);
         $movements = InventoryMovement::all($filters, $per, ($page - 1) * $per);
         $products = InventoryProduct::all();
+        $jornadas = Jornada::all();
         $refCostByProduct = InventoryMovement::latestCostByProduct();
         $pagination = [
             'list' => ['total' => $total, 'page' => $page, 'per' => $per, 'param' => 'p'],
@@ -91,12 +124,13 @@ class InventoryController {
             'filters' => pagination_query_preserve([
                 'product_id' => $filters['product_id'] ?? null,
                 'jornada_id' => $filters['jornada_id'] ?? null,
+                'purchase_id' => $filters['purchase_id'] ?? null,
             ]),
         ];
         include BASE_PATH . '/app/views/inventory/movements.php';
     }
 
-    /** @return array{product_id:?int,jornada_id:?int} */
+    /** @return array{product_id:?int,jornada_id:?int,purchase_id:?int} */
     private static function movementFiltersFromRequest(): array {
         $filters = [];
         if (!empty($_GET['product_id'])) {
@@ -105,21 +139,39 @@ class InventoryController {
         if (!empty($_GET['jornada_id'])) {
             $filters['jornada_id'] = (int)$_GET['jornada_id'];
         }
+        if (!empty($_GET['purchase_id'])) {
+            $filters['purchase_id'] = (int)$_GET['purchase_id'];
+        }
         return [
             'product_id' => $filters['product_id'] ?? null,
             'jornada_id' => $filters['jornada_id'] ?? null,
+            'purchase_id' => $filters['purchase_id'] ?? null,
         ];
     }
 
-    private static function movementFilterLabel(array $filters, array $products): string {
+    /** @param array<int,array<string,mixed>> $jornadas */
+    private static function movementFilterLabel(array $filters, array $products, array $jornadas = []): string {
+        $parts = [];
         if (!empty($filters['product_id'])) {
             foreach ($products as $p) {
                 if ((int)$p['id'] === (int)$filters['product_id']) {
-                    return $p['name'] . ' (' . $p['sku'] . ')';
+                    $parts[] = 'Producto: ' . $p['name'] . ' (' . $p['sku'] . ')';
+                    break;
                 }
             }
         }
-        return 'Todos los productos';
+        if (!empty($filters['jornada_id'])) {
+            foreach ($jornadas as $j) {
+                if ((int)$j['id'] === (int)$filters['jornada_id']) {
+                    $parts[] = 'Jornada: ' . $j['name'] . ' (' . $j['fecha'] . ')';
+                    break;
+                }
+            }
+        }
+        if (!empty($filters['purchase_id'])) {
+            $parts[] = 'Compra/donación #' . (int)$filters['purchase_id'];
+        }
+        return $parts !== [] ? implode(' · ', $parts) : 'Sin filtros';
     }
 
     private static function requireDompdfOrRedirect(string $backRoute, array $params = []): bool {
@@ -168,6 +220,7 @@ class InventoryController {
         $query = array_filter([
             'product_id' => $filters['product_id'],
             'jornada_id' => $filters['jornada_id'],
+            'purchase_id' => $filters['purchase_id'],
         ], fn($v) => $v !== null && $v !== '');
         if (!self::requireDompdfOrRedirect('inventory_movements', $query)) {
             return;
@@ -182,8 +235,12 @@ class InventoryController {
         $total = InventoryMovement::count($filterArgs);
         $movements = InventoryMovement::all($filterArgs, min(5000, max(1, $total)), 0);
         $products = InventoryProduct::all();
+        $jornadas = Jornada::all();
         $refCostByProduct = InventoryMovement::latestCostByProduct();
-        $filterLabel = self::movementFilterLabel($filterArgs, $products);
+        if ($filters['purchase_id']) {
+            $filterArgs['purchase_id'] = $filters['purchase_id'];
+        }
+        $filterLabel = self::movementFilterLabel($filterArgs, $products, $jornadas);
         $generatedAt = date('Y-m-d H:i');
         ob_start();
         include BASE_PATH . '/app/views/inventory/pdf_movements.php';
@@ -289,6 +346,152 @@ class InventoryController {
         include BASE_PATH . '/app/views/inventory/purchase.php';
     }
 
+    public static function purchasesIndex(): void {
+        self::requireInventoryRole();
+        if (!self::ensureTables()) {
+            return;
+        }
+        $compras = InventoryPurchase::allSummaries(false);
+        $donaciones = InventoryPurchase::allSummaries(true);
+        include BASE_PATH . '/app/views/inventory/purchases.php';
+    }
+
+    public static function purchaseJson(): void {
+        self::requireInventoryRole();
+        if (!self::ensureTables()) {
+            return;
+        }
+        header('Content-Type: application/json; charset=UTF-8');
+        $id = (int)($_GET['id'] ?? 0);
+        $purchase = InventoryPurchase::find($id);
+        if (!$purchase) {
+            http_response_code(404);
+            echo json_encode(['error' => 'No encontrado'], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+        $linesOut = [];
+        $totalBs = 0.0;
+        foreach (InventoryPurchase::lines($id) as $m) {
+            $qty = (float)$m['cantidad'];
+            $unit = (float)($m['precio_bs'] ?? 0);
+            $lineBs = $qty * $unit;
+            $totalBs += $lineBs;
+            $linesOut[] = [
+                'id' => (int)$m['id'],
+                'product_id' => (int)$m['product_id'],
+                'product_name' => $m['product_name'],
+                'sku' => $m['sku'],
+                'unidad_metrica' => $m['unidad_metrica'],
+                'cantidad' => $qty,
+                'precio_bs' => $m['precio_bs'] !== null ? (float)$m['precio_bs'] : 0,
+                'total_bs' => round($lineBs, 2),
+            ];
+        }
+        $summary = array_merge($purchase, ['total_bs' => $totalBs]);
+        $totalUsd = InventoryPurchase::totalUsdForSummary($summary);
+        echo json_encode([
+            'purchase' => [
+                'id' => (int)$purchase['id'],
+                'fecha' => $purchase['fecha'],
+                'tasa' => (float)$purchase['tasa'],
+                'notes' => $purchase['notes'],
+                'es_donacion' => (int)$purchase['es_donacion'] === 1,
+                'donante' => $purchase['donante'],
+                'referencia' => $purchase['referencia'],
+                'created_by_name' => $purchase['created_by_name'] ?? null,
+                'total_bs' => round($totalBs, 2),
+                'total_usd' => $totalUsd,
+            ],
+            'lines' => $linesOut,
+        ], JSON_UNESCAPED_UNICODE);
+    }
+
+    public static function purchaseUpdateStore(): void {
+        self::requireInventoryRole();
+        if (!self::ensureTables()) {
+            return;
+        }
+        if (!csrf_verify()) {
+            flash('error', 'CSRF inválido');
+            redirect('inventory_purchases');
+        }
+        $id = (int)($_POST['id'] ?? 0);
+        $purchase = InventoryPurchase::find($id);
+        if (!$purchase) {
+            flash('error', 'Compra no encontrada');
+            redirect('inventory_purchases');
+            return;
+        }
+        $esDonacion = !empty($_POST['es_donacion']) || (int)$purchase['es_donacion'] === 1;
+        $fecha = trim($_POST['fecha'] ?? '');
+        $tasa = (float)($_POST['tasa'] ?? 0);
+        $notes = trim($_POST['notes'] ?? '');
+        $referencia = trim($_POST['referencia'] ?? '');
+        $donante = trim($_POST['donante'] ?? '');
+        if ($fecha === '') {
+            flash('error', 'La fecha es obligatoria');
+            redirect('inventory_purchases');
+            return;
+        }
+        if ($esDonacion && $donante === '') {
+            flash('error', 'Indique el donante');
+            redirect('inventory_purchases');
+            return;
+        }
+        if (!$esDonacion && $tasa <= 0) {
+            flash('error', 'Indique la tasa del día');
+            redirect('inventory_purchases');
+            return;
+        }
+        if ($esDonacion && $tasa <= 0) {
+            $tasa = 0;
+        }
+        $lines = self::parsePurchaseLines($_POST);
+        if ($lines === []) {
+            flash('error', 'Indique al menos una línea válida');
+            redirect('inventory_purchases');
+            return;
+        }
+        try {
+            InventoryPurchase::update(
+                $id,
+                [
+                    'fecha' => $fecha,
+                    'tasa' => $tasa,
+                    'notes' => $notes !== '' ? $notes : null,
+                    'es_donacion' => $esDonacion,
+                    'donante' => $esDonacion && $donante !== '' ? $donante : null,
+                    'referencia' => !$esDonacion && $referencia !== '' ? $referencia : null,
+                ],
+                $lines,
+                Auth::user()['id'] ?? null
+            );
+            flash('success', 'Registro actualizado');
+        } catch (Throwable $e) {
+            flash('error', $e->getMessage());
+        }
+        redirect('inventory_purchases');
+    }
+
+    public static function purchaseDeleteStore(): void {
+        self::requireInventoryRole();
+        if (!self::ensureTables()) {
+            return;
+        }
+        if (!csrf_verify()) {
+            flash('error', 'CSRF inválido');
+            redirect('inventory_purchases');
+        }
+        $id = (int)($_POST['id'] ?? 0);
+        try {
+            InventoryPurchase::delete($id);
+            flash('success', 'Registro eliminado e inventario ajustado');
+        } catch (Throwable $e) {
+            flash('error', $e->getMessage());
+        }
+        redirect('inventory_purchases');
+    }
+
     public static function purchaseStore(): void {
         self::requireInventoryRole();
         if (!csrf_verify()) {
@@ -334,7 +537,7 @@ class InventoryController {
                 Auth::user()['id'] ?? null
             );
             flash('success', 'Compra registrada e inventario actualizado');
-            redirect('inventory_movements');
+            redirect('inventory_purchases');
         } catch (Throwable $e) {
             flash('error', $e->getMessage());
             redirect('inventory_purchase');
@@ -493,9 +696,9 @@ class InventoryController {
         $lineNotes = $post['line_notes'] ?? [];
         foreach ($productIds as $i => $pid) {
             $pid = (int)$pid;
-            $qty = (float)($cantidades[$i] ?? 0);
-            $pb = (float)($precios[$i] ?? 0);
-            if ($pid <= 0 || $qty <= 0) {
+            $qty = self::parseDecimalCell((string)($cantidades[$i] ?? ''));
+            $pb = self::parseDecimalCell((string)($precios[$i] ?? ''));
+            if ($pid <= 0 || $qty === null || $qty <= 0 || $pb === null || $pb < 0) {
                 continue;
             }
             $lines[] = [
@@ -540,6 +743,133 @@ class InventoryController {
         include BASE_PATH . '/app/views/inventory/import.php';
     }
 
+    public static function purchaseDonationsTemplate(): void {
+        self::requireInventoryRole();
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="plantilla-donaciones-compras.csv"');
+        echo "\xEF\xBB\xBF";
+        echo self::csvLine(['fecha', 'donante', 'sku', 'cantidad', 'precio_bs', 'notas'], ';') . "\r\n";
+        echo self::csvLine(['2026-10-15', 'Nombre del donante', 'SKU-DEL-PRODUCTO', '1', '8800', 'opcional'], ';') . "\r\n";
+        exit;
+    }
+
+    public static function purchaseDonationsImportStore(): void {
+        self::requireInventoryRole();
+        if (!self::ensureTables()) {
+            return;
+        }
+        if (!csrf_verify()) {
+            flash('error', 'CSRF inválido');
+            redirect('inventory_purchase');
+        }
+        if (empty($_FILES['csv']) || !is_uploaded_file($_FILES['csv']['tmp_name'])) {
+            flash('error', 'Seleccione un archivo CSV');
+            redirect('inventory_purchase');
+            return;
+        }
+        try {
+            $allRows = self::readCsvRows($_FILES['csv']['tmp_name']);
+        } catch (InvalidArgumentException $e) {
+            flash('error', $e->getMessage());
+            redirect('inventory_purchase');
+            return;
+        }
+        $header = array_map([self::class, 'normalizeCsvHeaderName'], $allRows[0]);
+        $idx = [
+            'fecha' => self::csvColumnIndex($header, 'fecha', ['fech', 'fecha_compra', 'fecha_de_compra', 'date']),
+            'donante' => self::csvColumnIndex($header, 'donante', ['apellidos_y_nombres', 'nombre', 'donor']),
+            'sku' => self::csvColumnIndex($header, 'sku', ['rubro', 'codigo', 'code']),
+            'cantidad' => self::csvColumnIndex($header, 'cantidad', ['unidades', 'qty', 'cant']),
+            'precio_bs' => self::csvColumnIndex($header, 'precio_bs', ['precio_unitario', 'precio_unitario_bs', 'precio']),
+            'notas' => self::csvColumnIndex($header, 'notas', ['notes', 'observaciones']),
+        ];
+        if ($idx['fecha'] === false || $idx['donante'] === false || $idx['sku'] === false || $idx['cantidad'] === false || $idx['precio_bs'] === false) {
+            flash('error', 'El CSV debe incluir: fecha, donante, sku (rubro), cantidad, precio_bs');
+            redirect('inventory_purchase');
+            return;
+        }
+        /** @var array<string, array{fecha:string,donante:string,lines:array<int,array{product_id:int,cantidad:float,precio_bs:float,notes:?string}>}> $groups */
+        $groups = [];
+        $errors = [];
+        $lineNum = 1;
+        for ($r = 1, $n = count($allRows); $r < $n; $r++) {
+            $lineNum++;
+            $row = self::alignDonationCsvRow($allRows[$r], count($allRows[0]), $idx);
+            if (count(array_filter($row, static fn($c) => trim((string)$c) !== '')) === 0) {
+                continue;
+            }
+            $fechaRaw = trim((string)($row[$idx['fecha']] ?? ''));
+            $fecha = self::parseDonationCsvDate($fechaRaw);
+            $donante = trim((string)($row[$idx['donante']] ?? ''));
+            $donante = preg_replace('/\s*;\s*/', ' ', $donante) ?? $donante;
+            $donante = trim($donante, " \t\"'");
+            $sku = trim((string)($row[$idx['sku']] ?? ''));
+            $qty = self::parseDecimalCell((string)($row[$idx['cantidad']] ?? ''));
+            $precioRaw = trim((string)($row[$idx['precio_bs']] ?? ''));
+            $precio = $precioRaw === '' ? 0.0 : self::parseDecimalCell($precioRaw);
+            $notas = $idx['notas'] !== false ? trim((string)($row[$idx['notas']] ?? '')) : '';
+            if ($fecha === null || $donante === '' || $sku === '') {
+                $errors[] = "Línea $lineNum: fecha, donante y sku obligatorios"
+                    . ($fechaRaw !== '' && $fecha === null ? " (fecha «$fechaRaw» no reconocida)" : '');
+                continue;
+            }
+            if ($qty === null || $qty <= 0 || $precio === null || $precio < 0) {
+                $errors[] = "Línea $lineNum: cantidad y precio_bs inválidos (cantidad="
+                    . trim((string)($row[$idx['cantidad']] ?? '')) . ', precio_bs='
+                    . $precioRaw . ')';
+                continue;
+            }
+            $product = InventoryProduct::resolveImportCode($sku);
+            if (!$product) {
+                $errors[] = "Línea $lineNum: producto «$sku» no existe (sku o id en inventario)";
+                continue;
+            }
+            $key = $fecha . '|' . mb_strtolower($donante, 'UTF-8');
+            if (!isset($groups[$key])) {
+                $groups[$key] = ['fecha' => $fecha, 'donante' => $donante, 'lines' => []];
+            }
+            $groups[$key]['lines'][] = [
+                'product_id' => (int)$product['id'],
+                'cantidad' => $qty,
+                'precio_bs' => $precio,
+                'notes' => $notas !== '' ? $notas : null,
+            ];
+        }
+        if ($groups === []) {
+            flash('error', $errors ? implode(' | ', array_slice($errors, 0, 5)) : 'No hay filas válidas para importar');
+            redirect('inventory_purchase');
+            return;
+        }
+        $userId = Auth::user()['id'] ?? null;
+        $created = 0;
+        foreach ($groups as $group) {
+            try {
+                InventoryPurchase::create(
+                    [
+                        'fecha' => $group['fecha'],
+                        'tasa' => 0,
+                        'notes' => 'Importación CSV donaciones',
+                        'es_donacion' => true,
+                        'donante' => $group['donante'],
+                        'referencia' => null,
+                    ],
+                    $group['lines'],
+                    $userId
+                );
+                $created++;
+            } catch (Throwable $e) {
+                $errors[] = 'Donante ' . $group['donante'] . ': ' . $e->getMessage();
+            }
+        }
+        $msg = "Donaciones importadas: $created compra(s) registrada(s).";
+        if ($errors) {
+            flash('error', $msg . ' Errores: ' . implode(' | ', array_slice($errors, 0, 5)));
+        } else {
+            flash('success', $msg);
+        }
+        redirect('inventory_purchases');
+    }
+
     public static function templateCsv(): void {
         self::requireInventoryRole();
         header('Content-Type: text/csv; charset=UTF-8');
@@ -565,11 +895,107 @@ class InventoryController {
     }
 
     private static function parseDecimalCell(string $raw): ?float {
-        $raw = trim(str_replace(',', '.', $raw));
+        $raw = trim($raw);
         if ($raw === '') {
             return null;
         }
+        if (strlen($raw) >= 2 && $raw[0] === '"' && substr($raw, -1) === '"') {
+            $raw = substr($raw, 1, -1);
+        }
+        $raw = preg_replace('/[\s\x{00A0}\x{202F}]/u', '', $raw) ?? $raw;
+        $raw = preg_replace('/\p{Sc}|\b(?:Bs\.?|VEF|USD)\b/ui', '', $raw) ?? $raw;
+        $raw = str_replace(["\u{FF0E}", "\u{066B}"], '.', $raw);
+        $raw = trim($raw);
+        if ($raw === '') {
+            return null;
+        }
+        if (!preg_match('/^-?\d[\d.,]*/', $raw, $m)) {
+            return null;
+        }
+        $raw = $m[0];
+        $hasComma = str_contains($raw, ',');
+        $hasDot = str_contains($raw, '.');
+        if ($hasComma && $hasDot) {
+            if (strrpos($raw, ',') > strrpos($raw, '.')) {
+                $raw = str_replace('.', '', $raw);
+                $raw = str_replace(',', '.', $raw);
+            } else {
+                $raw = str_replace(',', '', $raw);
+            }
+        } elseif ($hasComma) {
+            $raw = str_replace(',', '.', $raw);
+        }
+        if (!is_numeric($raw)) {
+            return null;
+        }
         return (float)$raw;
+    }
+
+    /** @param array<int,string|false> $idx */
+    private static function alignDonationCsvRow(array $row, int $headerLen, array $idx): array {
+        if ($headerLen <= 0) {
+            return $row;
+        }
+        if (count($row) < $headerLen) {
+            return array_pad($row, $headerLen, '');
+        }
+        $cIdx = $idx['cantidad'];
+        $pIdx = $idx['precio_bs'];
+        if ($cIdx === false || $pIdx === false) {
+            return $row;
+        }
+        $cIdx = (int)$cIdx;
+        $pIdx = (int)$pIdx;
+        while (count($row) > $headerLen) {
+            $before = count($row);
+            if (isset($row[$cIdx + 1]) && self::csvDecimalSplitFragment($row[$cIdx], $row[$cIdx + 1])) {
+                $row[$cIdx] = $row[$cIdx] . ',' . $row[$cIdx + 1];
+                array_splice($row, $cIdx + 1, 1);
+            } elseif (isset($row[$pIdx + 1]) && self::csvDecimalSplitFragment($row[$pIdx], $row[$pIdx + 1])) {
+                $row[$pIdx] = $row[$pIdx] . ',' . $row[$pIdx + 1];
+                array_splice($row, $pIdx + 1, 1);
+            } else {
+                break;
+            }
+            if (count($row) === $before) {
+                break;
+            }
+        }
+        if (count($row) > $headerLen) {
+            $row = array_slice($row, 0, $headerLen);
+        }
+        return $row;
+    }
+
+    private static function csvDecimalSplitFragment(string $whole, string $frac): bool {
+        $whole = trim($whole);
+        $frac = trim($frac);
+        return preg_match('/^\d+$/', $whole) === 1 && preg_match('/^\d{1,3}$/', $frac) === 1;
+    }
+
+    private static function parseDonationCsvDate(string $raw): ?string {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return null;
+        }
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw) === 1) {
+            return $raw;
+        }
+        foreach (['d/m/Y', 'd-m-Y', 'd/m/y', 'j/n/Y', 'j/n/y'] as $fmt) {
+            $dt = DateTime::createFromFormat($fmt, $raw);
+            if ($dt instanceof DateTime) {
+                $errors = DateTime::getLastErrors();
+                if ($errors !== false && ($errors['warning_count'] > 0 || $errors['error_count'] > 0)) {
+                    continue;
+                }
+                return $dt->format('Y-m-d');
+            }
+        }
+        $ts = strtotime($raw);
+        if ($ts !== false) {
+            return date('Y-m-d', $ts);
+        }
+        return null;
     }
 
     /** @param array<int,string> $row */
@@ -624,9 +1050,17 @@ class InventoryController {
         if (!$lines) {
             throw new InvalidArgumentException('Archivo vacío');
         }
+        $headerDelimiter = self::detectCsvDelimiter(trim($lines[0]));
         $rows = [];
-        foreach ($lines as $line) {
-            $row = self::expandCsvRow($line);
+        foreach ($lines as $i => $line) {
+            $row = self::expandCsvRow($line, $headerDelimiter);
+            if ($i > 0 && $rows !== [] && count($row) < count($rows[0])) {
+                $alt = $headerDelimiter === ';' ? ',' : ';';
+                $retry = self::expandCsvRow($line, $alt);
+                if (count($retry) > count($row)) {
+                    $row = $retry;
+                }
+            }
             if ($row !== []) {
                 $rows[] = $row;
             }
@@ -638,12 +1072,12 @@ class InventoryController {
     }
 
     /** @return array<int,string> */
-    private static function expandCsvRow(string $line): array {
+    private static function expandCsvRow(string $line, ?string $delimiter = null): array {
         $line = trim($line);
         if ($line === '') {
             return [];
         }
-        $delimiter = self::detectCsvDelimiter($line);
+        $delimiter ??= self::detectCsvDelimiter($line);
         $row = str_getcsv($line, $delimiter, '"', '\\');
         if (count($row) > 1) {
             return array_map(fn($c) => trim((string)$c), $row);
@@ -656,7 +1090,7 @@ class InventoryController {
         if (strlen($single) >= 2 && $single[0] === '"' && substr($single, -1) === '"') {
             $single = str_replace('""', '"', substr($single, 1, -1));
         }
-        $innerDelim = self::detectCsvDelimiter($single);
+        $innerDelim = $delimiter;
         $expanded = str_getcsv($single, $innerDelim, '"', '\\');
         if (count($expanded) > 1) {
             return array_map(fn($c) => trim((string)$c), $expanded);
@@ -759,7 +1193,7 @@ class InventoryController {
             $name = trim((string)($row[$idx['producto']] ?? ''));
             $unit = trim((string)($row[$idx['unidad_metrica']] ?? ''));
             $stockRaw = $idx['stock'] !== false ? trim((string)($row[$idx['stock']] ?? '')) : '';
-            $targetStock = $stockRaw !== '' ? (float)str_replace(',', '.', $stockRaw) : null;
+            $targetStock = $stockRaw !== '' ? self::parseDecimalCell($stockRaw) : null;
             $costPayload = self::importMovementPayload($row, $idx, $fecha);
             $hasCost = isset($costPayload['precio_bs']) || isset($costPayload['tasa']) || isset($costPayload['precio_usd']);
             if ($sku === '' || $name === '' || $unit === '') {

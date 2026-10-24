@@ -16,7 +16,8 @@ page_back('members', 'Volver a miembros');
     </div>
     <div class="col-md-6 mb-3">
       <label class="form-label">Correo</label>
-      <input type="email" name="email" class="form-control" required value="<?= h($member['email'] ?? '') ?>">
+      <input type="email" name="email" class="form-control" value="<?= h($member['email'] ?? '') ?>">
+      <div class="form-text">Opcional. Sin correo el miembro no podrá iniciar sesión.</div>
     </div>
   </div>
   <div class="row">

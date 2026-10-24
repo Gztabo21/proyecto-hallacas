@@ -50,8 +50,70 @@ class Mission {
                 }
             }
         }
+        $byName = self::findIdByName($cell, $onlyActive);
+        if ($byName !== null) {
+            return $byName;
+        }
         return null;
     }
+
+    public static function findIdByName(string $name, bool $onlyActive = true): ?int {
+        $name = trim($name);
+        if ($name === '') {
+            return null;
+        }
+        $lower = mb_strtolower($name, 'UTF-8');
+        foreach (self::all($onlyActive) as $m) {
+            if (mb_strtolower((string)$m['name'], 'UTF-8') === $lower) {
+                return (int)$m['id'];
+            }
+        }
+        return null;
+    }
+
+    /** Crea misión auxiliar (ej. Iglesia) si no existe. */
+    public static function ensureByNameAndCode(string $name, string $code): int {
+        $id = self::findIdByName($name, false);
+        if ($id !== null) {
+            return $id;
+        }
+        $code = strtoupper(trim($code));
+        foreach (self::all(false) as $m) {
+            if (strcasecmp((string)$m['code'], $code) === 0) {
+                return (int)$m['id'];
+            }
+        }
+        return self::create([
+            'name' => $name,
+            'code' => $code,
+            'description' => null,
+            'status' => 'active',
+        ]);
+    }
+
+    public static function resolveForDistributionImport(string $cell): ?int {
+        $cell = trim($cell);
+        if ($cell === '') {
+            return null;
+        }
+        $id = self::resolveImportReference($cell);
+        if ($id !== null) {
+            return $id;
+        }
+        if (mb_strtolower($cell, 'UTF-8') === 'iglesia') {
+            return self::ensureByNameAndCode('Iglesia', 'IGLE');
+        }
+        return self::findIdByName($cell) ?? self::ensureByNameAndCode($cell, self::codeFromName($cell));
+    }
+
+    private static function codeFromName(string $name): string {
+        $slug = strtoupper(preg_replace('/[^A-Z0-9]+/i', '', mb_substr($name, 0, 8, 'UTF-8')) ?? '');
+        if ($slug === '') {
+            $slug = 'MISC';
+        }
+        return substr($slug, 0, 12);
+    }
+
     public static function create(array $data): int {
         DB::query('INSERT INTO missions (name,code,description,coordinator_id,status) VALUES (?,?,?,?,?)',
             [$data['name'],$data['code'],$data['description'] ?? null, $data['coordinator_id'] ?? null, $data['status'] ?? 'active']);

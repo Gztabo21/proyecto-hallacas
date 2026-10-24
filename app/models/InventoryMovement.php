@@ -11,6 +11,15 @@ class InventoryMovement {
         return $map[$tipo] ?? $tipo;
     }
 
+    /** @param array<string,mixed> $movement */
+    public static function tipoLabelForMovement(array $movement): string {
+        $tipo = (string)($movement['tipo'] ?? '');
+        if ($tipo === 'compra' && !empty($movement['purchase_es_donacion'])) {
+            return 'Donaciones';
+        }
+        return self::tipoLabel($tipo);
+    }
+
     public static function isEntrada(string $tipo): bool {
         return in_array($tipo, ['stock_inicial', 'compra', 'devolucion_jornada'], true);
     }
@@ -150,12 +159,18 @@ class InventoryMovement {
             $where .= ' AND m.tipo = ?';
             $p[] = $filters['tipo'];
         }
+        if (!empty($filters['purchase_id'])) {
+            $where .= ' AND m.purchase_id = ?';
+            $p[] = (int)$filters['purchase_id'];
+        }
         $sql = "SELECT m.*, p.name AS product_name, p.sku, p.unidad_metrica,
-                       j.name AS jornada_name, u.name AS created_by_name
+                       j.name AS jornada_name, u.name AS created_by_name,
+                       pur.es_donacion AS purchase_es_donacion
                 FROM inventory_movements m
                 JOIN inventory_products p ON p.id = m.product_id
                 LEFT JOIN jornadas j ON j.id = m.jornada_id
                 LEFT JOIN users u ON u.id = m.created_by
+                LEFT JOIN inventory_purchases pur ON pur.id = m.purchase_id
                 $where
                 ORDER BY m.fecha_ingreso DESC, m.id DESC
                 LIMIT " . (int)$limit . ' OFFSET ' . (int)$offset;
@@ -172,6 +187,10 @@ class InventoryMovement {
         if (!empty($filters['jornada_id'])) {
             $where .= ' AND jornada_id = ?';
             $p[] = (int)$filters['jornada_id'];
+        }
+        if (!empty($filters['purchase_id'])) {
+            $where .= ' AND purchase_id = ?';
+            $p[] = (int)$filters['purchase_id'];
         }
         return (int)DB::query("SELECT COUNT(*) c FROM inventory_movements $where", $p)->fetch()['c'];
     }
@@ -241,5 +260,29 @@ class InventoryMovement {
             $usd = self::usdFromBs($bs, $tasa);
         }
         return ['precio_bs' => $bs, 'precio_usd' => $usd, 'tasa' => $tasa, 'is_ref' => true];
+    }
+
+    /**
+     * @param array<string,mixed> $movement
+     * @param array<int,array{precio_bs:?float,precio_usd:?float,tasa:?float}> $refByProduct
+     * @return array{bs:float,usd:float}
+     */
+    public static function lineTotalAmounts(array $movement, array $refByProduct): array {
+        $qty = (float)($movement['cantidad'] ?? 0);
+        $price = self::displayUnitPrice($movement, $refByProduct);
+        $bs = 0.0;
+        $usd = 0.0;
+        if ($price['precio_bs'] !== null && $price['precio_bs'] > 0) {
+            $bs = $qty * $price['precio_bs'];
+        }
+        if ($price['precio_usd'] !== null && $price['precio_usd'] > 0) {
+            $usd = $qty * $price['precio_usd'];
+        } elseif ($bs > 0 && $price['tasa'] !== null && $price['tasa'] > 0 && $price['precio_bs'] !== null) {
+            $unitUsd = self::usdFromBs($price['precio_bs'], $price['tasa']);
+            if ($unitUsd !== null) {
+                $usd = $qty * $unitUsd;
+            }
+        }
+        return ['bs' => $bs, 'usd' => $usd];
     }
 }

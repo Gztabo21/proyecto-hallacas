@@ -6,7 +6,7 @@ page_back('members', 'Volver a miembros');
   <p class="mb-2">Primera fila con encabezados (separador <code>;</code> o <code>,</code>). Guarde desde Excel como <strong>CSV UTF-8</strong>.</p>
   <code>nombre;email;telefono;mision;password;estado</code>
   <ul class="text-muted small mt-2 mb-0">
-    <li><strong>nombre</strong>, <strong>email</strong>: obligatorios.</li>
+    <li><strong>nombre</strong>: obligatorio. <strong>email</strong>: opcional (sin correo no ingresa a la plataforma).</li>
     <li><strong>mision</strong>: obligatorio para admin — código (<code>M01</code>), nombre (<code>Misión 1</code>) o número (<code>1</code>). Coordinador: opcional (usa su misión).</li>
     <li><strong>password</strong>: opcional por fila; si está vacío se usa la contraseña por defecto del formulario.</li>
     <li><strong>estado</strong>: <code>active</code> / <code>inactive</code> (opcional).</li>

@@ -38,6 +38,22 @@ class InventoryProduct {
         return $r ?: null;
     }
 
+    /** Código en CSV: sku textual o id numérico del producto (p. ej. columna «rubro» 1, 2, 3). */
+    public static function resolveImportCode(string $code): ?array {
+        $code = trim($code);
+        if ($code === '') {
+            return null;
+        }
+        $bySku = self::findBySku($code);
+        if ($bySku) {
+            return $bySku;
+        }
+        if (preg_match('/^\d+$/', $code) === 1) {
+            return self::find((int)$code);
+        }
+        return null;
+    }
+
     public static function create(array $data): int {
         DB::query(
             'INSERT INTO inventory_products (name, sku, unidad_metrica, stock) VALUES (?,?,?,0)',

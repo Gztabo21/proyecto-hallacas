@@ -21,7 +21,20 @@
         <li class="nav-item"><a class="nav-link" href="<?= url('jornadas') ?>">Jornadas</a></li>
         <?php endif; ?>
         <?php if (Auth::canAccessInventory()): ?>
-        <li class="nav-item"><a class="nav-link" href="<?= url('inventory') ?>">Inventario</a></li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Inventario</a>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="<?= url('inventory') ?>">Catálogo y stock</a></li>
+            <li><a class="dropdown-item" href="<?= url('inventory_purchases') ?>">Compras y donaciones</a></li>
+            <li><a class="dropdown-item" href="<?= url('inventory_purchase') ?>">Registrar compra</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="<?= url('inventory_movements') ?>">Historial de movimientos</a></li>
+            <li><a class="dropdown-item" href="<?= url('inventory_initial') ?>">Stock inicial</a></li>
+            <?php if (Auth::canManageInventoryCatalog()): ?>
+            <li><a class="dropdown-item" href="<?= url('inventory_import') ?>">Importar catálogo CSV</a></li>
+            <?php endif; ?>
+          </ul>
+        </li>
         <?php endif; ?>
         <?php if (Auth::isAdmin()): ?>
         <li class="nav-item"><a class="nav-link" href="<?= url('missions') ?>">Misiones</a></li>

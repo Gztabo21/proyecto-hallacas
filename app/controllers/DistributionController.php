@@ -233,8 +233,28 @@ class DistributionController {
             echo json_encode(['ok' => false, 'error' => 'Solo administrador puede crear coordinadores']);
             return;
         }
-        if ($name === '' || $email === '') {
-            echo json_encode(['ok' => false, 'error' => 'Nombre y correo son obligatorios']);
+        if ($name === '') {
+            echo json_encode(['ok' => false, 'error' => 'El nombre es obligatorio']);
+            return;
+        }
+        User::ensureEmailNullable();
+        if ($role === 'member' && $email === '') {
+            try {
+                $uid = User::ensureMemberForDistribution($name, $mid, null);
+            } catch (InvalidArgumentException $e) {
+                echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+                return;
+            }
+            $label = $name;
+            echo json_encode([
+                'ok' => true,
+                'member' => ['id' => $uid, 'name' => $label],
+                'mission_id' => $mid,
+            ], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+        if ($email === '') {
+            echo json_encode(['ok' => false, 'error' => 'Correo obligatorio para coordinadores']);
             return;
         }
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -283,6 +303,253 @@ class DistributionController {
             return true;
         }
         return false;
+    }
+
+    private static function assertJornadaDistributionAccess(int $jornadaId): ?string {
+        if (Auth::isAdmin()) {
+            return null;
+        }
+        if (Auth::isJornadaAdmin()) {
+            return in_array($jornadaId, Auth::jornadaIds(), true) ? null : 'No autorizado';
+        }
+        if (Auth::isCoordinator()) {
+            $mid = Auth::missionId();
+            if (!$mid) {
+                return 'No autorizado';
+            }
+            foreach (Jornada::missionsFor($jornadaId) as $jm) {
+                if ((int)$jm['mission_id'] === $mid) {
+                    return null;
+                }
+            }
+            return 'No autorizado';
+        }
+        return 'No autorizado';
+    }
+
+    /** Asegura cupo en jornada_mision: al menos la suma del CSV y lo ya entregado en esa misión. */
+    private static function ensureMissionAssignment(int $jornadaId, int $missionId, int $sumFromCsv): void {
+        $yaEntregado = (int)DB::query(
+            'SELECT COALESCE(SUM(hallacas_entregadas),0) s FROM entregas WHERE jornada_id=? AND mission_id=?',
+            [$jornadaId, $missionId]
+        )->fetch()['s'];
+        $minAsignadas = max($sumFromCsv, $yaEntregado);
+        $row = DB::query(
+            'SELECT hallacas_asignadas FROM jornada_mision WHERE jornada_id=? AND mission_id=?',
+            [$jornadaId, $missionId]
+        )->fetch();
+        if (!$row) {
+            Jornada::asignarMision($jornadaId, $missionId, max(0, $minAsignadas), 'Importación CSV');
+            return;
+        }
+        $current = (int)$row['hallacas_asignadas'];
+        if ($current < $minAsignadas) {
+            Jornada::setMissionAsignadas($jornadaId, $missionId, $minAsignadas, 'Importación CSV');
+        }
+    }
+
+    public static function importEntregasTemplate(): void {
+        require_role('admin', 'coordinator', 'jornada_admin');
+        $jid = (int)($_GET['jornada_id'] ?? 0);
+        if ($jid <= 0 || !Jornada::find($jid)) {
+            flash('error', 'Jornada no válida');
+            redirect('jornadas');
+            return;
+        }
+        if (self::assertJornadaDistributionAccess($jid) !== null) {
+            flash('error', 'No autorizado');
+            redirect('jornada_show', ['id' => $jid]);
+            return;
+        }
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="plantilla_distribucion_jornada_' . $jid . '.csv"');
+        echo "\xEF\xBB\xBF";
+        echo csv_line(['mision', 'miembro', 'hallacas', 'email']) . "\n";
+        echo csv_line(['1', 'Nombre Apellido', '4', '']) . "\n";
+        exit;
+    }
+
+    public static function importEntregasExample(): void {
+        require_role('admin', 'coordinator', 'jornada_admin');
+        $jid = (int)($_GET['jornada_id'] ?? 0);
+        if ($jid <= 0 || !Jornada::find($jid)) {
+            flash('error', 'Jornada no válida');
+            redirect('jornadas');
+            return;
+        }
+        if (self::assertJornadaDistributionAccess($jid) !== null) {
+            flash('error', 'No autorizado');
+            redirect('jornada_show', ['id' => $jid]);
+            return;
+        }
+        $path = BASE_PATH . '/data/jornada-' . $jid . '-distribucion.csv';
+        if (!is_readable($path)) {
+            flash('error', 'No hay archivo de ejemplo para esta jornada');
+            redirect('jornada_show', ['id' => $jid]);
+            return;
+        }
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="jornada_' . $jid . '_distribucion.csv"');
+        readfile($path);
+        exit;
+    }
+
+    public static function importEntregasStore(): void {
+        require_role('admin', 'coordinator', 'jornada_admin');
+        User::ensureEmailNullable();
+        if (!csrf_verify()) {
+            flash('error', 'CSRF inválido');
+            redirect('jornadas');
+        }
+        $jid = (int)($_POST['jornada_id'] ?? 0);
+        $jornada = Jornada::find($jid);
+        if (!$jornada) {
+            flash('error', 'Jornada no encontrada');
+            redirect('jornadas');
+            return;
+        }
+        $authErr = self::assertJornadaDistributionAccess($jid);
+        if ($authErr !== null) {
+            flash('error', $authErr);
+            redirect('jornada_show', ['id' => $jid]);
+            return;
+        }
+        if (empty($_FILES['csv']) || !is_uploaded_file($_FILES['csv']['tmp_name'])) {
+            flash('error', 'Seleccione un archivo CSV');
+            redirect('jornada_show', ['id' => $jid]);
+            return;
+        }
+        try {
+            $allRows = csv_read_rows($_FILES['csv']['tmp_name']);
+        } catch (InvalidArgumentException $e) {
+            flash('error', $e->getMessage());
+            redirect('jornada_show', ['id' => $jid]);
+            return;
+        }
+        if (count($allRows) < 1) {
+            flash('error', 'Archivo vacío');
+            redirect('jornada_show', ['id' => $jid]);
+            return;
+        }
+        $header = array_map('csv_normalize_header_name', $allRows[0]);
+        $idxMision = csv_column_index($header, 'mision', ['misión', 'mission', 'codigo_mision']);
+        $idxMiembro = csv_column_index($header, 'miembro', ['nombre', 'name', 'member']);
+        $idxHallacas = csv_column_index($header, 'hallacas', ['cantidad', 'cant', 'entregadas', 'hallacas_entregadas']);
+        $idxEmail = csv_column_index($header, 'email', ['correo', 'e_mail']);
+        if ($idxMision === false || $idxMiembro === false || $idxHallacas === false) {
+            flash('error', 'El CSV debe incluir columnas mision, miembro y hallacas');
+            redirect('jornada_show', ['id' => $jid]);
+            return;
+        }
+        // isCoordinator() incluye admin; solo el rol coordinator queda limitado a su misión.
+        $coordinatorMission = Auth::role() === 'coordinator' ? (int)Auth::missionId() : null;
+        $parsed = [];
+        $missionTotals = [];
+        $errors = [];
+        $lineNum = 1;
+        for ($r = 1, $n = count($allRows); $r < $n; $r++) {
+            $lineNum++;
+            $row = $allRows[$r];
+            if (count(array_filter($row, fn($c) => trim((string)$c) !== '')) === 0) {
+                continue;
+            }
+            $missionRaw = trim((string)($row[$idxMision] ?? ''));
+            $name = trim((string)($row[$idxMiembro] ?? ''));
+            $hallRaw = trim((string)($row[$idxHallacas] ?? ''));
+            $email = $idxEmail !== false ? trim((string)($row[$idxEmail] ?? '')) : '';
+            if ($missionRaw === '' || $name === '') {
+                $errors[] = "Línea $lineNum: misión y miembro obligatorios";
+                continue;
+            }
+            if ($hallRaw === '' || !ctype_digit($hallRaw)) {
+                $errors[] = "Línea $lineNum: hallacas debe ser un entero (valor: «$hallRaw»)";
+                continue;
+            }
+            $hall = (int)$hallRaw;
+            if ($hall < 0) {
+                $errors[] = "Línea $lineNum: hallacas no puede ser negativa";
+                continue;
+            }
+            $mid = Mission::resolveForDistributionImport($missionRaw);
+            if ($mid === null) {
+                $errors[] = "Línea $lineNum: misión no reconocida («$missionRaw»)";
+                continue;
+            }
+            if ($coordinatorMission !== null && $mid !== $coordinatorMission) {
+                $errors[] = "Línea $lineNum: solo puede importar entregas de su misión";
+                continue;
+            }
+            if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $errors[] = "Línea $lineNum: correo inválido";
+                continue;
+            }
+            $parsed[] = ['mid' => $mid, 'name' => $name, 'hall' => $hall, 'email' => $email !== '' ? $email : null];
+            $missionTotals[$mid] = ($missionTotals[$mid] ?? 0) + $hall;
+        }
+        if (!$parsed && $errors) {
+            flash('error', implode(' · ', array_slice($errors, 0, 8)));
+            redirect('jornada_show', ['id' => $jid]);
+            return;
+        }
+        foreach ($missionTotals as $mid => $total) {
+            self::ensureMissionAssignment($jid, (int)$mid, (int)$total);
+        }
+        $precio = price_for_jornada($jornada);
+        $created = 0;
+        $updated = 0;
+        $skipped = 0;
+        $userId = Auth::user()['id'];
+        foreach ($parsed as $i => $item) {
+            $lineNum = $i + 2;
+            try {
+                $memberId = User::ensureMemberForDistribution($item['name'], $item['mid'], $item['email']);
+            } catch (InvalidArgumentException $e) {
+                $errors[] = "Línea $lineNum: " . $e->getMessage();
+                continue;
+            }
+            if (!User::canReceiveHallacaDistribution($memberId, $item['mid'])) {
+                $errors[] = "Línea $lineNum: no se pudo registrar al destinatario";
+                continue;
+            }
+            $exist = Entrega::byMemberJornada($jid, $memberId);
+            if ($exist) {
+                $prev = (int)$exist['hallacas_entregadas'];
+                if ($prev === $item['hall']) {
+                    $skipped++;
+                    continue;
+                }
+                $err = Entrega::setHallacasEntregadas((int)$exist['id'], $item['hall']);
+                if ($err !== null) {
+                    $errors[] = "Línea $lineNum: $err";
+                    continue;
+                }
+                $updated++;
+            } else {
+                Entrega::create([
+                    'jornada_id' => $jid,
+                    'mission_id' => $item['mid'],
+                    'member_id' => $memberId,
+                    'hallacas_entregadas' => $item['hall'],
+                    'hallacas_pagadas' => 0,
+                    'precio_unitario' => $precio,
+                    'monto_pagado' => 0,
+                    'notes' => 'Importación CSV',
+                    'created_by' => $userId,
+                ]);
+                $created++;
+            }
+        }
+        $msg = "Importación: $created creadas, $updated actualizadas";
+        if ($skipped > 0) {
+            $msg .= ", $skipped sin cambios";
+        }
+        if ($errors) {
+            $msg .= '. Avisos: ' . implode(' · ', array_slice($errors, 0, 6));
+            flash('warning', $msg);
+        } else {
+            flash('success', $msg);
+        }
+        redirect('jornada_show', ['id' => $jid]);
     }
 
     private static function captureFromUpload(): ?string {

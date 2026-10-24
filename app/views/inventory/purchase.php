@@ -1,8 +1,22 @@
 <?php include BASE_PATH . '/app/views/partials/header.php';
-page_back('inventory', 'Volver al inventario');
+page_back('inventory_purchases', 'Compras y donaciones');
 ?>
 <h2>Registrar compra</h2>
-<p class="text-muted">Precio total (Bs) = cantidad × precio unitario (Bs). Precio total (USD) = precio total (Bs) ÷ tasa del día.</p>
+<p class="text-muted">Precio total (Bs) = cantidad × precio unitario (Bs). Precio total (USD) = precio total (Bs) ÷ tasa del día. Cantidad y precio unitario admiten decimales (punto o coma).</p>
+<div class="card p-3 shadow-sm mb-3">
+  <h6 class="mb-2">Importar donaciones (CSV)</h6>
+  <p class="text-muted small mb-2">Columnas: <code>fecha;donante;sku;cantidad;precio_bs;notas</code> (Excel a veces trunca el encabezado a <code>fech</code>; también vale). Fecha en <code>AAAA-MM-DD</code> o <code>DD/MM/AAAA</code>. <strong>sku</strong>: código del producto en inventario o <strong>id numérico</strong> (rubro 1, 2, 3…). Decimales con punto o coma. <strong>precio_bs</strong> vacío = 0. Se agrupa por fecha + donante.</p>
+  <form method="post" action="<?= url('inventory_purchase_donations_import') ?>" enctype="multipart/form-data" class="d-flex flex-wrap align-items-end gap-2">
+    <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
+    <div class="flex-grow-1" style="min-width:14rem">
+      <label class="form-label small mb-0">Archivo CSV</label>
+      <input type="file" name="csv" class="form-control form-control-sm" accept=".csv,text/csv" required>
+    </div>
+    <button class="btn btn-sm btn-primary">Importar donaciones</button>
+    <a class="btn btn-sm btn-outline-secondary" href="<?= url('inventory_purchase_donations_template') ?>">Plantilla</a>
+    <a class="btn btn-sm btn-outline-secondary" href="<?= h(asset('data/donaciones_2026-10-15.csv')) ?>" download>Descargar ejemplo 15/10/2026</a>
+  </form>
+</div>
 <form method="post" action="<?= url('inventory_purchase_store') ?>" class="card p-3 shadow-sm" id="purchaseForm">
   <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
   <div class="row mb-3">
@@ -61,8 +75,8 @@ page_back('inventory', 'Volver al inventario');
           <?php endforeach; ?>
         </select>
       </td>
-      <td><input type="number" step="0.001" min="0" name="cantidad[]" class="form-control form-control-sm qty"></td>
-      <td><input type="number" step="0.0001" min="0" name="precio_bs[]" class="form-control form-control-sm precio-bs"></td>
+      <td><input type="text" inputmode="decimal" name="cantidad[]" class="form-control form-control-sm qty" placeholder="ej. 1,59" autocomplete="off"></td>
+      <td><input type="text" inputmode="decimal" name="precio_bs[]" class="form-control form-control-sm precio-bs" placeholder="ej. 4382,95" autocomplete="off"></td>
       <td><span class="total-bs-preview text-muted small">—</span></td>
       <td><span class="usd-preview text-muted small">—</span></td>
       <td><input name="line_notes[]" class="form-control form-control-sm"></td>
@@ -87,8 +101,8 @@ page_back('inventory', 'Volver al inventario');
         <?php endforeach; ?>
       </select>
     </td>
-    <td><input type="number" step="0.001" min="0" name="cantidad[]" class="form-control form-control-sm qty"></td>
-    <td><input type="number" step="0.0001" min="0" name="precio_bs[]" class="form-control form-control-sm precio-bs"></td>
+    <td><input type="text" inputmode="decimal" name="cantidad[]" class="form-control form-control-sm qty" placeholder="ej. 1,59" autocomplete="off"></td>
+    <td><input type="text" inputmode="decimal" name="precio_bs[]" class="form-control form-control-sm precio-bs" placeholder="ej. 4382,95" autocomplete="off"></td>
     <td><span class="total-bs-preview text-muted small">—</span></td>
     <td><span class="usd-preview text-muted small">—</span></td>
     <td><input name="line_notes[]" class="form-control form-control-sm"></td>
@@ -126,10 +140,27 @@ page_back('inventory', 'Volver al inventario');
     if (!isFinite(n)) return '—';
     return n.toFixed(dec);
   }
+  function parseDecimal(raw){
+    raw = String(raw || '').trim().replace(/\s/g, '');
+    if (!raw) return NaN;
+    var hasComma = raw.indexOf(',') >= 0;
+    var hasDot = raw.indexOf('.') >= 0;
+    if (hasComma && hasDot) {
+      if (raw.lastIndexOf(',') > raw.lastIndexOf('.')) {
+        raw = raw.replace(/\./g, '').replace(',', '.');
+      } else {
+        raw = raw.replace(/,/g, '');
+      }
+    } else if (hasComma) {
+      raw = raw.replace(',', '.');
+    }
+    var n = parseFloat(raw);
+    return isFinite(n) ? n : NaN;
+  }
   function updateRow(row){
-    var tasa = parseFloat(tasaEl && tasaEl.value ? tasaEl.value : '0');
-    var qty = parseFloat(row.querySelector('.qty')?.value || '0');
-    var unitBs = parseFloat(row.querySelector('.precio-bs')?.value || '0');
+    var tasa = parseDecimal(tasaEl && tasaEl.value ? tasaEl.value : '0');
+    var qty = parseDecimal(row.querySelector('.qty')?.value || '');
+    var unitBs = parseDecimal(row.querySelector('.precio-bs')?.value || '');
     var totalBs = (qty > 0 && unitBs >= 0) ? qty * unitBs : NaN;
     var totalBsEl = row.querySelector('.total-bs-preview');
     var usdEl = row.querySelector('.usd-preview');

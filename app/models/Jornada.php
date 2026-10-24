@@ -40,8 +40,13 @@ class Jornada {
         return DB::query('SELECT jm.*, m.name AS mission_name, m.code FROM jornada_mision jm JOIN missions m ON m.id=jm.mission_id WHERE jm.jornada_id=? ORDER BY m.name', [$jornadaId])->fetchAll();
     }
     public static function asignarMision(int $jornadaId, int $missionId, int $hallacas, ?string $notes = null): void {
-        DB::query('INSERT INTO jornada_mision (jornada_id,mission_id,hallacas_asignadas,notes) VALUES (?,?,?,?) AS jm ON DUPLICATE KEY UPDATE hallacas_asignadas=hallacas_asignadas+jm.hallacas_asignadas, notes=jm.notes',
-            [$jornadaId,$missionId,$hallacas,$notes]);
+        DB::query(
+            'INSERT INTO jornada_mision (jornada_id, mission_id, hallacas_asignadas, notes) VALUES (?,?,?,?) AS new_row
+             ON DUPLICATE KEY UPDATE
+               hallacas_asignadas = jornada_mision.hallacas_asignadas + new_row.hallacas_asignadas,
+               notes = new_row.notes',
+            [$jornadaId, $missionId, $hallacas, $notes]
+        );
     }
     public static function setMissionAsignadas(int $jornadaId, int $missionId, int $hallacas, ?string $notes = null): void {
         if ($notes !== null) {
