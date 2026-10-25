@@ -34,7 +34,17 @@ page_back('inventory_purchases', 'Compras y donaciones');
     </div>
   </div>
   <div class="row mb-3">
-    <div class="col-md-8">
+    <div class="col-md-4">
+      <label class="form-label">Etiquetas</label>
+      <input name="etiquetas" class="form-control" placeholder="Ej: jornada 2, insumos" list="purchaseEtiquetasDatalist">
+      <datalist id="purchaseEtiquetasDatalist">
+        <?php foreach (InventoryPurchase::allDistinctEtiquetas() as $tag): ?>
+        <option value="<?= h($tag) ?>">
+        <?php endforeach; ?>
+      </datalist>
+      <div class="form-text">Separadas por coma; categorías para filtrar después.</div>
+    </div>
+    <div class="col-md-4">
       <label class="form-label">Notas generales</label>
       <input name="notes" class="form-control" placeholder="opcional">
     </div>

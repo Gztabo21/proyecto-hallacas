@@ -199,6 +199,131 @@ class InventoryMovement {
         return self::all(['jornada_id' => $jornadaId], 500, 0);
     }
 
+    public static function find(int $id): ?array {
+        $stmt = DB::query(
+            'SELECT m.*, p.name AS product_name, p.sku, p.unidad_metrica
+             FROM inventory_movements m
+             JOIN inventory_products p ON p.id = m.product_id
+             WHERE m.id = ?',
+            [$id]
+        );
+        $r = $stmt->fetch();
+        return $r ?: null;
+    }
+
+    public static function sumSalidaJornada(int $jornadaId, int $productId, ?int $excludeMovementId = null): float {
+        $sql = 'SELECT COALESCE(SUM(cantidad),0) s FROM inventory_movements
+                WHERE jornada_id=? AND product_id=? AND tipo="salida_jornada"';
+        $p = [$jornadaId, $productId];
+        if ($excludeMovementId !== null) {
+            $sql .= ' AND id <> ?';
+            $p[] = $excludeMovementId;
+        }
+        return (float)DB::query($sql, $p)->fetch()['s'];
+    }
+
+    public static function sumDevolucionJornada(int $jornadaId, int $productId): float {
+        return (float)DB::query(
+            'SELECT COALESCE(SUM(cantidad),0) s FROM inventory_movements
+             WHERE jornada_id=? AND product_id=? AND tipo="devolucion_jornada"',
+            [$jornadaId, $productId]
+        )->fetch()['s'];
+    }
+
+    /** @param array<string,mixed> $movement */
+    private static function assertSalidaCantidadValid(array $movement, float $newCantidad, ?int $excludeId = null): void {
+        $newCantidad = abs($newCantidad);
+        if ($newCantidad <= 0) {
+            throw new InvalidArgumentException('La cantidad debe ser mayor que cero.');
+        }
+        $jid = (int)$movement['jornada_id'];
+        $pid = (int)$movement['product_id'];
+        $movId = (int)$movement['id'];
+        $exclude = $excludeId ?? $movId;
+        $otrasSalidas = self::sumSalidaJornada($jid, $pid, $exclude);
+        $devuelto = self::sumDevolucionJornada($jid, $pid);
+        if ($otrasSalidas + $newCantidad + 0.0001 < $devuelto) {
+            throw new InvalidArgumentException(
+                'No puede quedar por debajo de lo ya devuelto (' . rtrim(rtrim(number_format($devuelto, 3, '.', ''), '0'), '.') . ').'
+            );
+        }
+    }
+
+    public static function updateSalidaJornada(int $id, float $cantidad, string $fechaIngreso, ?string $notes): void {
+        $mov = self::find($id);
+        if (!$mov || ($mov['tipo'] ?? '') !== 'salida_jornada') {
+            throw new InvalidArgumentException('Salida no encontrada.');
+        }
+        $oldQty = (float)$mov['cantidad'];
+        $newQty = abs($cantidad);
+        self::assertSalidaCantidadValid($mov, $newQty);
+        $pid = (int)$mov['product_id'];
+        $stockDelta = $oldQty - $newQty;
+        if ($stockDelta < -0.0001) {
+            $need = -$stockDelta;
+            $stock = InventoryProduct::stockOf($pid);
+            if ($stock + 1e-9 < $need) {
+                throw new InvalidArgumentException('Stock insuficiente en almacén para aumentar esta salida.');
+            }
+        }
+        $pdo = DB::connect();
+        $ownTx = !$pdo->inTransaction();
+        if ($ownTx) {
+            $pdo->beginTransaction();
+        }
+        try {
+            if (abs($stockDelta) > 0.0001) {
+                InventoryProduct::adjustStock($pid, $stockDelta);
+            }
+            DB::query(
+                'UPDATE inventory_movements SET cantidad=?, fecha_ingreso=?, notes=? WHERE id=?',
+                [$newQty, $fechaIngreso, $notes !== '' ? $notes : null, $id]
+            );
+            if ($ownTx) {
+                $pdo->commit();
+            }
+        } catch (Throwable $e) {
+            if ($ownTx && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    public static function deleteSalidaJornada(int $id): void {
+        $mov = self::find($id);
+        if (!$mov || ($mov['tipo'] ?? '') !== 'salida_jornada') {
+            throw new InvalidArgumentException('Salida no encontrada.');
+        }
+        $qty = (float)$mov['cantidad'];
+        $jid = (int)$mov['jornada_id'];
+        $pid = (int)$mov['product_id'];
+        $otrasSalidas = self::sumSalidaJornada($jid, $pid, $id);
+        $devuelto = self::sumDevolucionJornada($jid, $pid);
+        if ($otrasSalidas + 0.0001 < $devuelto) {
+            throw new InvalidArgumentException(
+                'No se puede eliminar: hay devoluciones registradas que superan el resto entregado de este producto.'
+            );
+        }
+        $pdo = DB::connect();
+        $ownTx = !$pdo->inTransaction();
+        if ($ownTx) {
+            $pdo->beginTransaction();
+        }
+        try {
+            InventoryProduct::adjustStock($pid, $qty);
+            DB::query('DELETE FROM inventory_movements WHERE id=?', [$id]);
+            if ($ownTx) {
+                $pdo->commit();
+            }
+        } catch (Throwable $e) {
+            if ($ownTx && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
     /** @return array<int,array{precio_bs:?float,precio_usd:?float,tasa:?float}> */
     public static function latestCostByProduct(): array {
         $rows = DB::query(

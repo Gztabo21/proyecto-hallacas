@@ -1,13 +1,99 @@
 <?php
 class InventoryPurchase {
+    /** @param array{fecha_desde?:string,fecha_hasta?:string,etiquetas?:list<string>} $filters */
+    public static function parseEtiquetasInput(?string $raw): ?string {
+        if ($raw === null || trim($raw) === '') {
+            return null;
+        }
+        $parts = preg_split('/[,;]+/u', $raw) ?: [];
+        $tags = [];
+        foreach ($parts as $part) {
+            $t = trim((string)$part);
+            if ($t === '') {
+                continue;
+            }
+            $key = mb_strtolower($t, 'UTF-8');
+            if (!isset($tags[$key])) {
+                $tags[$key] = $t;
+            }
+        }
+        if ($tags === []) {
+            return null;
+        }
+        return json_encode(array_values($tags), JSON_UNESCAPED_UNICODE);
+    }
+
+    /** @return list<string> */
+    public static function etiquetasList(?string $stored): array {
+        if ($stored === null || $stored === '') {
+            return [];
+        }
+        if (is_array($stored)) {
+            return array_values(array_filter(array_map('trim', $stored), static fn($t) => $t !== ''));
+        }
+        $decoded = json_decode((string)$stored, true);
+        if (is_array($decoded)) {
+            return array_values(array_filter(array_map('trim', $decoded), static fn($t) => $t !== ''));
+        }
+        return array_values(array_filter(array_map('trim', explode(',', (string)$stored)), static fn($t) => $t !== ''));
+    }
+
+    public static function etiquetasToInput(?string $stored): string {
+        return implode(', ', self::etiquetasList($stored));
+    }
+
+    /** @return list<string> */
+    public static function allDistinctEtiquetas(): array {
+        $rows = DB::query(
+            'SELECT etiquetas FROM inventory_purchases WHERE etiquetas IS NOT NULL AND etiquetas <> "null"'
+        )->fetchAll();
+        $map = [];
+        foreach ($rows as $row) {
+            foreach (self::etiquetasList($row['etiquetas'] ?? null) as $tag) {
+                $key = mb_strtolower($tag, 'UTF-8');
+                if (!isset($map[$key])) {
+                    $map[$key] = $tag;
+                }
+            }
+        }
+        natcasesort($map);
+        return array_values($map);
+    }
+
     /** @return array<int,array<string,mixed>> */
-    public static function allSummaries(?bool $esDonacion = null): array {
-        $where = '';
+    public static function allSummaries(?bool $esDonacion = null, array $filters = []): array {
+        $conds = [];
         $params = [];
         if ($esDonacion !== null) {
-            $where = 'WHERE p.es_donacion = ?';
+            $conds[] = 'p.es_donacion = ?';
             $params[] = $esDonacion ? 1 : 0;
         }
+        $desde = trim((string)($filters['fecha_desde'] ?? ''));
+        $hasta = trim((string)($filters['fecha_hasta'] ?? ''));
+        if ($desde !== '') {
+            $conds[] = 'p.fecha >= ?';
+            $params[] = $desde;
+        }
+        if ($hasta !== '') {
+            $conds[] = 'p.fecha <= ?';
+            $params[] = $hasta;
+        }
+        $filterTags = $filters['etiquetas'] ?? [];
+        if (is_array($filterTags) && $filterTags !== []) {
+            $tagOr = [];
+            foreach ($filterTags as $tag) {
+                $tag = trim((string)$tag);
+                if ($tag === '') {
+                    continue;
+                }
+                $tagOr[] = 'JSON_CONTAINS(COALESCE(p.etiquetas, JSON_ARRAY()), CAST(? AS JSON))';
+                $params[] = json_encode($tag, JSON_UNESCAPED_UNICODE);
+            }
+            if ($tagOr !== []) {
+                $conds[] = '(' . implode(' OR ', $tagOr) . ')';
+            }
+        }
+        $where = $conds !== [] ? 'WHERE ' . implode(' AND ', $conds) : '';
         return DB::query(
             "SELECT p.*,
                     u.name AS created_by_name,
@@ -99,11 +185,12 @@ class InventoryPurchase {
             $donante = $esDonacion && isset($header['donante']) && trim((string)$header['donante']) !== ''
                 ? trim((string)$header['donante']) : null;
             DB::query(
-                'UPDATE inventory_purchases SET fecha = ?, tasa = ?, notes = ?, es_donacion = ?, donante = ?, referencia = ? WHERE id = ?',
+                'UPDATE inventory_purchases SET fecha = ?, tasa = ?, notes = ?, etiquetas = ?, es_donacion = ?, donante = ?, referencia = ? WHERE id = ?',
                 [
                     $header['fecha'],
                     $header['tasa'],
                     $header['notes'] ?? null,
+                    $header['etiquetas'] ?? null,
                     $esDonacion,
                     $donante,
                     $referencia,
@@ -130,8 +217,8 @@ class InventoryPurchase {
             $donante = $esDonacion && isset($header['donante']) && trim((string)$header['donante']) !== ''
                 ? trim((string)$header['donante']) : null;
             DB::query(
-                'INSERT INTO inventory_purchases (fecha, tasa, notes, es_donacion, donante, referencia, created_by) VALUES (?,?,?,?,?,?,?)',
-                [$header['fecha'], $header['tasa'], $header['notes'] ?? null, $esDonacion, $donante, $referencia, $userId]
+                'INSERT INTO inventory_purchases (fecha, tasa, notes, etiquetas, es_donacion, donante, referencia, created_by) VALUES (?,?,?,?,?,?,?,?)',
+                [$header['fecha'], $header['tasa'], $header['notes'] ?? null, $header['etiquetas'] ?? null, $esDonacion, $donante, $referencia, $userId]
             );
             $purchaseId = (int)$pdo->lastInsertId();
             self::insertLines($purchaseId, $header, $lines, $userId);

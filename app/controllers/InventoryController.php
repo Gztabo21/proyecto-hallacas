@@ -75,6 +75,33 @@ class InventoryController {
                 'ALTER TABLE inventory_purchases ADD COLUMN referencia VARCHAR(120) NULL'
             );
         }
+        if (!isset($cols['etiquetas'])) {
+            DB::query(
+                'ALTER TABLE inventory_purchases ADD COLUMN etiquetas JSON NULL'
+            );
+        }
+    }
+
+    /** @return array{fecha_desde:string,fecha_hasta:string,etiquetas:list<string>} */
+    private static function purchaseListFilters(): array {
+        $tags = [];
+        if (isset($_GET['etiqueta'])) {
+            $raw = $_GET['etiqueta'];
+            $tags = is_array($raw) ? $raw : [$raw];
+        }
+        $tags = array_values(array_unique(array_filter(array_map(
+            static fn($t) => trim((string)$t),
+            $tags
+        ), static fn($t) => $t !== '')));
+        return [
+            'fecha_desde' => trim((string)($_GET['fecha_desde'] ?? '')),
+            'fecha_hasta' => trim((string)($_GET['fecha_hasta'] ?? '')),
+            'etiquetas' => $tags,
+        ];
+    }
+
+    private static function etiquetasFromPost(): ?string {
+        return InventoryPurchase::parseEtiquetasInput(trim((string)($_POST['etiquetas'] ?? '')));
     }
 
     /** @return array{0: string, 1: string} */
@@ -342,6 +369,7 @@ class InventoryController {
         if (!self::ensureTables()) {
             return;
         }
+        self::ensurePurchaseColumns();
         $products = InventoryProduct::all();
         include BASE_PATH . '/app/views/inventory/purchase.php';
     }
@@ -351,8 +379,11 @@ class InventoryController {
         if (!self::ensureTables()) {
             return;
         }
-        $compras = InventoryPurchase::allSummaries(false);
-        $donaciones = InventoryPurchase::allSummaries(true);
+        self::ensurePurchaseColumns();
+        $purchaseFilters = self::purchaseListFilters();
+        $compras = InventoryPurchase::allSummaries(false, $purchaseFilters);
+        $donaciones = InventoryPurchase::allSummaries(true, $purchaseFilters);
+        $etiquetaOptions = InventoryPurchase::allDistinctEtiquetas();
         include BASE_PATH . '/app/views/inventory/purchases.php';
     }
 
@@ -398,6 +429,8 @@ class InventoryController {
                 'es_donacion' => (int)$purchase['es_donacion'] === 1,
                 'donante' => $purchase['donante'],
                 'referencia' => $purchase['referencia'],
+                'etiquetas' => InventoryPurchase::etiquetasList($purchase['etiquetas'] ?? null),
+                'etiquetas_text' => InventoryPurchase::etiquetasToInput($purchase['etiquetas'] ?? null),
                 'created_by_name' => $purchase['created_by_name'] ?? null,
                 'total_bs' => round($totalBs, 2),
                 'total_usd' => $totalUsd,
@@ -462,6 +495,7 @@ class InventoryController {
                     'es_donacion' => $esDonacion,
                     'donante' => $esDonacion && $donante !== '' ? $donante : null,
                     'referencia' => !$esDonacion && $referencia !== '' ? $referencia : null,
+                    'etiquetas' => self::etiquetasFromPost(),
                 ],
                 $lines,
                 Auth::user()['id'] ?? null
@@ -532,6 +566,7 @@ class InventoryController {
                     'es_donacion' => $esDonacion,
                     'donante' => $esDonacion && $donante !== '' ? $donante : null,
                     'referencia' => $referencia !== '' ? $referencia : null,
+                    'etiquetas' => self::etiquetasFromPost(),
                 ],
                 $lines,
                 Auth::user()['id'] ?? null
@@ -593,6 +628,62 @@ class InventoryController {
             return;
         }
         flash('success', 'Salida de inventario registrada para la jornada');
+        redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario']);
+    }
+
+    public static function jornadaSalidaUpdate(): void {
+        self::requireInventoryRole();
+        if (!csrf_verify()) {
+            flash('error', 'CSRF inválido');
+            redirect('jornadas');
+        }
+        $jid = (int)($_POST['jornada_id'] ?? 0);
+        $movId = (int)($_POST['movement_id'] ?? 0);
+        self::assertJornadaInventory($jid);
+        $mov = InventoryMovement::find($movId);
+        if (!$mov || (int)($mov['jornada_id'] ?? 0) !== $jid) {
+            flash('error', 'Salida no encontrada');
+            redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario']);
+            return;
+        }
+        $cantidad = (float)($_POST['cantidad'] ?? 0);
+        $fecha = trim((string)($_POST['fecha_ingreso'] ?? ''));
+        $notes = trim((string)($_POST['notes'] ?? ''));
+        if ($fecha === '') {
+            flash('error', 'Indique la fecha');
+            redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario']);
+            return;
+        }
+        try {
+            InventoryMovement::updateSalidaJornada($movId, $cantidad, $fecha, $notes);
+            flash('success', 'Salida actualizada');
+        } catch (Throwable $e) {
+            flash('error', $e->getMessage());
+        }
+        redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario']);
+    }
+
+    public static function jornadaSalidaDelete(): void {
+        self::requireInventoryRole();
+        if (!csrf_verify()) {
+            flash('error', 'CSRF inválido');
+            redirect('jornadas');
+        }
+        $jid = (int)($_POST['jornada_id'] ?? 0);
+        $movId = (int)($_POST['movement_id'] ?? 0);
+        self::assertJornadaInventory($jid);
+        $mov = InventoryMovement::find($movId);
+        if (!$mov || (int)($mov['jornada_id'] ?? 0) !== $jid) {
+            flash('error', 'Salida no encontrada');
+            redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario']);
+            return;
+        }
+        try {
+            InventoryMovement::deleteSalidaJornada($movId);
+            flash('success', 'Salida eliminada y stock restaurado');
+        } catch (Throwable $e) {
+            flash('error', $e->getMessage());
+        }
         redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario']);
     }
 

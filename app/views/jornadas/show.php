@@ -770,8 +770,9 @@ include BASE_PATH . '/app/views/payments/_panel.php';
     <?php if (!empty($jornadaInventoryOut)): ?>
     <h6 class="mt-3 mb-2">Salidas registradas en esta jornada</h6>
     <div class="table-responsive">
+    <?php $canEditJornadaSalidas = Auth::canManageJornadaInventory((int)$jornada['id']); ?>
     <table class="table table-sm table-striped mb-0">
-      <thead><tr><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Registrado por</th></tr></thead>
+      <thead><tr><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Registrado por</th><?php if ($canEditJornadaSalidas): ?><th class="text-end" style="width:8rem">Acciones</th><?php endif; ?></tr></thead>
       <tbody>
       <?php foreach ($jornadaInventoryOut as $jo): if ($jo['tipo'] !== 'salida_jornada') continue; ?>
       <tr>
@@ -779,11 +780,73 @@ include BASE_PATH . '/app/views/payments/_panel.php';
         <td><?= h($jo['product_name']) ?></td>
         <td><?= h(rtrim(rtrim(number_format((float)$jo['cantidad'], 3, '.', ''), '0'), '.')) ?> <?= h($jo['unidad_metrica']) ?></td>
         <td><?= h($jo['created_by_name'] ?? '—') ?></td>
+        <?php if ($canEditJornadaSalidas): ?>
+        <td class="text-end text-nowrap">
+          <button type="button" class="btn btn-sm btn-outline-primary py-0 btn-edit-salida"
+                  data-bs-toggle="modal" data-bs-target="#editSalidaModal"
+                  data-id="<?= (int)$jo['id'] ?>"
+                  data-product="<?= h($jo['product_name']) ?>"
+                  data-cantidad="<?= h((float)$jo['cantidad']) ?>"
+                  data-fecha="<?= h($jo['fecha_ingreso']) ?>"
+                  data-notes="<?= h($jo['notes'] ?? '') ?>">Editar</button>
+          <form method="post" action="<?= url('inventory_jornada_salida_delete') ?>" class="d-inline" onsubmit="return confirm('¿Eliminar esta salida? El stock volverá al almacén.');">
+            <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
+            <input type="hidden" name="jornada_id" value="<?= (int)$jornada['id'] ?>">
+            <input type="hidden" name="movement_id" value="<?= (int)$jo['id'] ?>">
+            <button type="submit" class="btn btn-sm btn-outline-danger py-0">Eliminar</button>
+          </form>
+        </td>
+        <?php endif; ?>
       </tr>
       <?php endforeach; ?>
       </tbody>
     </table>
     </div>
+    <?php if ($canEditJornadaSalidas): ?>
+    <div class="modal fade" id="editSalidaModal" tabindex="-1" aria-labelledby="editSalidaModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <form method="post" action="<?= url('inventory_jornada_salida_update') ?>" class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="editSalidaModalLabel">Editar salida</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
+            <input type="hidden" name="jornada_id" value="<?= (int)$jornada['id'] ?>">
+            <input type="hidden" name="movement_id" id="editSalidaMovementId" value="">
+            <p class="small text-muted mb-2">Producto: <strong id="editSalidaProductLabel">—</strong></p>
+            <div class="mb-3">
+              <label class="form-label">Cantidad</label>
+              <input type="number" step="0.001" min="0.001" name="cantidad" id="editSalidaCantidad" class="form-control" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Fecha</label>
+              <input type="date" name="fecha_ingreso" id="editSalidaFecha" class="form-control" required>
+            </div>
+            <div class="mb-0">
+              <label class="form-label">Notas</label>
+              <input type="text" name="notes" id="editSalidaNotes" class="form-control">
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button class="btn btn-primary">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <script>
+    document.querySelectorAll('.btn-edit-salida').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.getElementById('editSalidaMovementId').value = btn.dataset.id || '';
+        document.getElementById('editSalidaProductLabel').textContent = btn.dataset.product || '—';
+        document.getElementById('editSalidaCantidad').value = btn.dataset.cantidad || '';
+        document.getElementById('editSalidaFecha').value = btn.dataset.fecha || '';
+        document.getElementById('editSalidaNotes').value = btn.dataset.notes || '';
+      });
+    });
+    </script>
+    <?php endif; ?>
     <?php endif; ?>
 
     <?php

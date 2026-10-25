@@ -1,6 +1,38 @@
 <?php
 class Pago {
+    public static function ensureSchema(): void {
+        static $checked = false;
+        if ($checked) {
+            return;
+        }
+        $checked = true;
+        try {
+            $rows = DB::query('SHOW COLUMNS FROM pagos')->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException) {
+            return;
+        }
+        $cols = [];
+        foreach ($rows as $row) {
+            $cols[strtolower((string)$row['Field'])] = true;
+        }
+        if (!isset($cols['moneda'])) {
+            DB::query(
+                "ALTER TABLE pagos ADD COLUMN moneda ENUM('USD','VES') NOT NULL DEFAULT 'VES' AFTER monto"
+            );
+        }
+        if (!isset($cols['referencia'])) {
+            DB::query('ALTER TABLE pagos ADD COLUMN referencia VARCHAR(120) NULL AFTER metodo');
+        }
+        if (!isset($cols['tasa'])) {
+            DB::query('ALTER TABLE pagos ADD COLUMN tasa DECIMAL(12,4) NULL AFTER referencia');
+        }
+        if (!isset($cols['captura'])) {
+            DB::query('ALTER TABLE pagos ADD COLUMN captura LONGTEXT NULL AFTER tasa');
+        }
+    }
+
     public static function create(array $data): int {
+        self::ensureSchema();
         DB::query(
             'INSERT INTO pagos (entrega_id,hallacas,monto,moneda,metodo,referencia,tasa,captura,status,notes,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
             [
@@ -148,6 +180,7 @@ class Pago {
 
     /** @return string|null Mensaje de error o null si ok */
     public static function update(int $id, array $data): ?string {
+        self::ensureSchema();
         $p = self::find($id);
         if (!$p) {
             return 'Pago no encontrado';

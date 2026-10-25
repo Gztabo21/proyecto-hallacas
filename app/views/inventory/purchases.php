@@ -7,6 +7,41 @@ page_back('inventory', 'Volver al inventario');
 </div>
 <p class="text-muted small">Totales por registro = suma de (cantidad × precio unitario Bs) de cada línea. En donaciones la tasa suele ser 0 y el USD no aplica.</p>
 <?php
+$purchaseFilters = $purchaseFilters ?? ['fecha_desde' => '', 'fecha_hasta' => '', 'etiquetas' => []];
+$etiquetaOptions = $etiquetaOptions ?? [];
+$hasPurchaseFilters = ($purchaseFilters['fecha_desde'] ?? '') !== ''
+    || ($purchaseFilters['fecha_hasta'] ?? '') !== ''
+    || !empty($purchaseFilters['etiquetas']);
+?>
+<form method="get" action="<?= url('inventory_purchases') ?>" class="card p-3 shadow-sm mb-3">
+  <input type="hidden" name="r" value="inventory_purchases">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-3">
+      <label class="form-label small mb-0">Desde</label>
+      <input type="date" name="fecha_desde" class="form-control form-control-sm" value="<?= h($purchaseFilters['fecha_desde'] ?? '') ?>">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small mb-0">Hasta</label>
+      <input type="date" name="fecha_hasta" class="form-control form-control-sm" value="<?= h($purchaseFilters['fecha_hasta'] ?? '') ?>">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small mb-0" for="purchaseEtiquetaFilter">Etiquetas</label>
+      <select name="etiqueta[]" id="purchaseEtiquetaFilter" class="form-select form-select-sm" multiple>
+        <?php foreach ($etiquetaOptions as $tag): ?>
+        <option value="<?= h($tag) ?>" <?= in_array($tag, $purchaseFilters['etiquetas'] ?? [], true) ? 'selected' : '' ?>><?= h($tag) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <div class="form-text">Varias etiquetas = registros que tengan al menos una.</div>
+    </div>
+    <div class="col-md-2 d-flex flex-wrap gap-2">
+      <button type="submit" class="btn btn-primary btn-sm flex-grow-1">Filtrar</button>
+      <?php if ($hasPurchaseFilters): ?>
+      <a class="btn btn-outline-secondary btn-sm" href="<?= url('inventory_purchases') ?>">Limpiar</a>
+      <?php endif; ?>
+    </div>
+  </div>
+</form>
+<?php
 $tableTitle = 'Compras';
 $isDonation = false;
 $rows = $compras;
@@ -64,7 +99,12 @@ include BASE_PATH . '/app/views/inventory/_purchases_table.php';
             <label class="form-label">Referencia</label>
             <input type="text" name="referencia" id="purchaseEditReferencia" class="form-control form-control-sm">
           </div>
-          <div class="col-12">
+          <div class="col-md-6">
+            <label class="form-label">Etiquetas</label>
+            <input type="text" name="etiquetas" id="purchaseEditEtiquetas" class="form-control form-control-sm" placeholder="Ej: jornada 2, insumos">
+            <div class="form-text">Separadas por coma; sirven para categorizar y filtrar.</div>
+          </div>
+          <div class="col-md-6">
             <label class="form-label">Notas</label>
             <input type="text" name="notes" id="purchaseEditNotes" class="form-control form-control-sm">
           </div>
@@ -100,6 +140,27 @@ include BASE_PATH . '/app/views/inventory/_purchases_table.php';
 </form>
 
 <?php ob_start(); ?>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/css/select2.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet">
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
+<script>
+jQuery(function($) {
+  if ($.fn.select2 && $('#purchaseEtiquetaFilter').length) {
+    $('#purchaseEtiquetaFilter').select2({
+      theme: 'bootstrap-5',
+      width: '100%',
+      placeholder: 'Todas las etiquetas',
+      allowClear: true,
+      tags: true,
+      language: {
+        noResults: function() { return 'Sin coincidencias'; },
+        searching: function() { return 'Buscando…'; }
+      }
+    });
+  }
+});
+</script>
 <script>
 (function(){
   if (typeof bootstrap === 'undefined') {
@@ -144,6 +205,15 @@ include BASE_PATH . '/app/views/inventory/_purchases_table.php';
       html += '<dt class="col-sm-3">Referencia</dt><dd class="col-sm-9">' + escapeHtml(p.referencia || '—') + '</dd>';
     }
     html += '<dt class="col-sm-3">Tasa</dt><dd class="col-sm-9">' + (p.tasa > 0 ? p.tasa : '—') + '</dd>';
+    html += '<dt class="col-sm-3">Etiquetas</dt><dd class="col-sm-9">';
+    if (p.etiquetas && p.etiquetas.length) {
+      p.etiquetas.forEach(function(t) {
+        html += '<span class="badge bg-secondary me-1">' + escapeHtml(t) + '</span>';
+      });
+    } else {
+      html += '—';
+    }
+    html += '</dd>';
     html += '<dt class="col-sm-3">Notas</dt><dd class="col-sm-9">' + escapeHtml(p.notes || '—') + '</dd>';
     html += '<dt class="col-sm-3">Registrado</dt><dd class="col-sm-9">' + escapeHtml(p.created_by_name || '—') + '</dd>';
     html += '</dl>';
@@ -174,6 +244,7 @@ include BASE_PATH . '/app/views/inventory/_purchases_table.php';
     document.getElementById('purchaseEditFecha').value = p.fecha;
     document.getElementById('purchaseEditTasa').value = p.tasa > 0 ? p.tasa : '';
     document.getElementById('purchaseEditNotes').value = p.notes || '';
+    document.getElementById('purchaseEditEtiquetas').value = p.etiquetas_text || '';
     document.getElementById('purchaseEditDonante').value = p.donante || '';
     document.getElementById('purchaseEditReferencia').value = p.referencia || '';
     document.querySelectorAll('.purchase-field-donante').forEach(function(el) {

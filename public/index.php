@@ -278,6 +278,12 @@ switch ($route) {
     case 'inventory_jornada_deliver':
         InventoryController::jornadaDeliverStore();
         break;
+    case 'inventory_jornada_salida_update':
+        InventoryController::jornadaSalidaUpdate();
+        break;
+    case 'inventory_jornada_salida_delete':
+        InventoryController::jornadaSalidaDelete();
+        break;
     case 'inventory_jornada_return':
         InventoryController::jornadaReturnStore();
         break;

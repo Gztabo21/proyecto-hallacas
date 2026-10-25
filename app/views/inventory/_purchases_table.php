@@ -35,6 +35,7 @@ foreach ($rows as $r) {
       <th class="text-end">Cantidad</th>
       <th class="text-end">Total (Bs)</th>
       <th class="text-end">Total (USD)</th>
+      <th>Etiquetas</th>
       <th>Notas</th>
       <th>Registrado por</th>
       <th></th>
@@ -42,7 +43,7 @@ foreach ($rows as $r) {
   </thead>
   <tbody>
   <?php if ($rows === []): ?>
-    <tr><td colspan="11" class="text-center text-muted py-3">Sin registros</td></tr>
+    <tr><td colspan="12" class="text-center text-muted py-3">Sin registros</td></tr>
   <?php else: foreach ($rows as $r):
     $usd = InventoryPurchase::totalUsdForSummary($r);
   ?>
@@ -55,6 +56,12 @@ foreach ($rows as $r) {
       <td class="text-end"><?= h(rtrim(rtrim(number_format((float)($r['total_cantidad'] ?? 0), 3, '.', ''), '0'), '.')) ?></td>
       <td class="text-end"><?= money($r['total_bs']) ?></td>
       <td class="text-end"><?= $usd !== null ? money($usd) : '—' ?></td>
+      <td class="small">
+        <?php $tags = InventoryPurchase::etiquetasList($r['etiquetas'] ?? null); ?>
+        <?php if ($tags === []): ?>—<?php else: foreach ($tags as $tag): ?>
+        <span class="badge bg-secondary fw-normal me-1"><?= h($tag) ?></span>
+        <?php endforeach; endif; ?>
+      </td>
       <td class="small text-muted"><?= h($r['notes'] ?? '') ?: '—' ?></td>
       <td class="small"><?= h($r['created_by_name'] ?? '—') ?></td>
       <td class="text-nowrap">
@@ -73,7 +80,7 @@ foreach ($rows as $r) {
       <td class="text-end"><?= h(rtrim(rtrim(number_format($sumCantidad, 3, '.', ''), '0'), '.')) ?></td>
       <td class="text-end"><?= money($sumBs) ?></td>
       <td class="text-end"><?= $hasUsd ? money($sumUsd) : '—' ?></td>
-      <td colspan="3"></td>
+      <td colspan="4"></td>
     </tr>
   </tfoot>
   <?php endif; ?>
