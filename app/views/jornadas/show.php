@@ -89,8 +89,12 @@ $jornadaUseTabs = count($jornadaTabLabels) > 1;
 <?php if ($jornadaTabEntregas): ?>
 <?php if ($jornadaUseTabs): ?><div class="tab-pane fade <?= $jornadaActiveTab === 'entregas' ? 'show active' : '' ?>" id="jornada-pane-entregas" role="tabpanel" aria-labelledby="jornada-tab-entregas" tabindex="0"><?php endif; ?>
 
+<?php
+$canManageJornadaMissions = Auth::isAdmin()
+    || (Auth::isJornadaAdmin() && in_array((int)$jornada['id'], Auth::jornadaIds(), true));
+?>
 <div class="d-flex flex-wrap gap-2 mb-3">
-<?php if (Auth::isAdmin()): ?>
+<?php if ($canManageJornadaMissions): ?>
 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#assignMissionModal">Asignar misión</button>
 <div class="modal fade" id="assignMissionModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
@@ -106,7 +110,7 @@ $jornadaUseTabs = count($jornadaTabLabels) > 1;
           <label class="form-label">Misión</label>
           <select name="mission_id" class="form-select" required>
             <?php foreach ($allMissions as $m): if($m['status']!=='active') continue; ?>
-            <?php if (!Auth::isAdmin() && Auth::missionId() !== (int)$m['id']) continue; ?>
+            <?php if (!$canManageJornadaMissions && Auth::missionId() !== (int)$m['id']) continue; ?>
             <option value="<?= (int)$m['id'] ?>"><?= h($m['name']) ?></option>
             <?php endforeach; ?>
           </select>

@@ -113,4 +113,56 @@ class Entrega {
         DB::query('UPDATE entregas SET hallacas_entregadas=?, status=? WHERE id=?', [$nueva, $status, $id]);
         return null;
     }
+
+    private static function moneyTotalsFromSql(string $where, array $params, ?string $groupBy = null): array {
+        $sql = 'SELECT';
+        if ($groupBy !== null) {
+            $sql .= ' e.' . $groupBy . ',';
+        }
+        $sql .= ' COALESCE(SUM(e.hallacas_entregadas * e.precio_unitario), 0) AS general,
+                  COALESCE(SUM(COALESCE(pc.pagado_confirmado, 0)), 0) AS pagado
+                  FROM entregas e
+                  LEFT JOIN (
+                      SELECT entrega_id, SUM(monto) AS pagado_confirmado
+                      FROM pagos WHERE status = "confirmado"
+                      GROUP BY entrega_id
+                  ) pc ON pc.entrega_id = e.id
+                  ' . $where;
+        if ($groupBy !== null) {
+            $sql .= ' GROUP BY e.' . $groupBy;
+        }
+        $rows = DB::query($sql, $params)->fetchAll();
+        if ($groupBy === null) {
+            $row = $rows[0] ?? ['general' => 0, 'pagado' => 0];
+            $general = (float)($row['general'] ?? 0);
+            $pagado = (float)($row['pagado'] ?? 0);
+            return [
+                'general' => $general,
+                'pagado' => $pagado,
+                'pendiente' => max(0.0, $general - $pagado),
+            ];
+        }
+        $map = [];
+        foreach ($rows as $row) {
+            $key = (int)$row[$groupBy];
+            $general = (float)($row['general'] ?? 0);
+            $pagado = (float)($row['pagado'] ?? 0);
+            $map[$key] = [
+                'general' => $general,
+                'pagado' => $pagado,
+                'pendiente' => max(0.0, $general - $pagado),
+            ];
+        }
+        return $map;
+    }
+
+    /** @return array{general: float, pagado: float, pendiente: float} */
+    public static function aggregateMoneyTotals(string $where, array $params): array {
+        return self::moneyTotalsFromSql($where, $params, null);
+    }
+
+    /** @return array<int, array{general: float, pagado: float, pendiente: float}> */
+    public static function aggregateMoneyByJornada(string $where, array $params): array {
+        return self::moneyTotalsFromSql($where, $params, 'jornada_id');
+    }
 }

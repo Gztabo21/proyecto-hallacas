@@ -2,7 +2,7 @@
 $nowLocal = date('Y-m-d\TH:i');
 ?>
 <?php if (empty($produccionTablesReady)): ?>
-<div class="alert alert-warning">Falta instalar las tablas de producción. Ejecute <code>sql/012_jornada_produccion.sql</code> en MySQL.</div>
+<div class="alert alert-warning mb-0">No se pudieron crear las tablas de producción automáticamente. Ejecute <code>sql/012_jornada_produccion.sql</code> en MySQL o contacte al administrador del servidor.</div>
 <?php else: ?>
 <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
   <span>Total retirado de mesas: <strong><?= (int)$produccionTotalRetirado ?></strong> hallacas</span>

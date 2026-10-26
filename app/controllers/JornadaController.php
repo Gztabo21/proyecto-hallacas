@@ -28,25 +28,17 @@ class JornadaController {
             $where = 'WHERE 1=1';
             $params = [];
         }
-        $row = DB::query(
-            "SELECT COALESCE(SUM(e.monto_pagado),0) AS pagado,
-                    COALESCE(SUM((e.hallacas_entregadas - e.hallacas_pagadas) * e.precio_unitario),0) AS pendiente
-             FROM entregas e $where",
-            $params
-        )->fetch();
-        $totalesPagado = (float)($row['pagado'] ?? 0);
-        $totalesPendiente = (float)($row['pendiente'] ?? 0);
-        $totalesGeneral = $totalesPagado + $totalesPendiente;
+        $totals = Entrega::aggregateMoneyTotals($where, $params);
+        $totalesGeneral = (float)$totals['general'];
+        $totalesPagado = (float)$totals['pagado'];
+        $totalesPendiente = (float)$totals['pendiente'];
 
-        // Totales por jornada para la lista
-        $aggRows = DB::query('SELECT jornada_id, COALESCE(SUM(monto_pagado),0) AS pagado, COALESCE(SUM((hallacas_entregadas - hallacas_pagadas) * precio_unitario),0) AS pendiente FROM entregas GROUP BY jornada_id')->fetchAll();
-        $aggMap = [];
-        foreach ($aggRows as $ar) $aggMap[(int)$ar['jornada_id']] = $ar;
+        $aggMap = Entrega::aggregateMoneyByJornada($where, $params);
         foreach ($jornadas as &$j) {
-            $a = $aggMap[(int)$j['id']] ?? ['pagado'=>0,'pendiente'=>0];
+            $a = $aggMap[(int)$j['id']] ?? ['general' => 0.0, 'pagado' => 0.0, 'pendiente' => 0.0];
+            $j['general'] = (float)$a['general'];
             $j['pagado'] = (float)$a['pagado'];
             $j['pendiente'] = (float)$a['pendiente'];
-            $j['general'] = $j['pagado'] + $j['pendiente'];
         }
         unset($j);
 
@@ -133,7 +125,7 @@ class JornadaController {
         $produccionTotalRetirado = 0;
         $produccionUsers = [];
         if ($jornadaTabProduccion) {
-            $produccionTablesReady = JornadaMesa::tablesReady();
+            $produccionTablesReady = JornadaMesa::ensureTables();
             if ($produccionTablesReady) {
                 $produccionMesas = JornadaMesa::bundleForJornada($id);
                 $produccionTotalRetirado = JornadaMesa::totalRetiradoJornada($id);
@@ -198,14 +190,22 @@ class JornadaController {
         redirect('jornadas');
     }
     public static function asignar(): void {
-        require_role('admin','coordinator');
+        require_role('admin', 'coordinator', 'jornada_admin');
         if (!csrf_verify()) { flash('error','CSRF inválido'); redirect('jornadas'); }
         $jid = (int)($_POST['jornada_id'] ?? 0);
         $mid = (int)($_POST['mission_id'] ?? 0);
         $hall = (int)($_POST['hallacas_asignadas'] ?? 0);
-        $jm = Jornada::missionsFor($jid);
-        // coordinator can only assign own mission
-        if (!Auth::isAdmin() && Auth::missionId() !== $mid) { flash('error','No autorizado'); redirect('jornada_show',['id'=>$jid]); }
+        if (Auth::isJornadaAdmin() && !in_array($jid, Auth::jornadaIds(), true)) {
+            flash('error', 'No autorizado');
+            redirect('jornadas');
+            return;
+        }
+        // Coordinador solo puede asignar su misión; admin y encargado de jornada, cualquier misión.
+        if (Auth::isCoordinator() && !Auth::isAdmin() && Auth::missionId() !== $mid) {
+            flash('error', 'No autorizado');
+            redirect('jornada_show', ['id' => $jid]);
+            return;
+        }
         $jornada = Jornada::find($jid);
         $totalHechas = isset($jornada['total_hallacas_hechas']) && $jornada['total_hallacas_hechas'] !== null && $jornada['total_hallacas_hechas'] !== ''
             ? (int)$jornada['total_hallacas_hechas'] : null;
