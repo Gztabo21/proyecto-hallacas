@@ -5,7 +5,7 @@
   <div class="card-header py-2"><h5 class="mb-0">App instalable (PWA)</h5></div>
   <div class="card-body">
     <form method="post" action="<?= url('pwa_settings_store') ?>">
-      <?= csrf_field() ?>
+      <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
       <div class="form-check">
         <input class="form-check-input" type="checkbox" name="pwa_enabled" value="1" id="pwa_enabled"<?= pwa_is_enabled() ? ' checked' : '' ?>>
         <label class="form-check-label" for="pwa_enabled">Activar manifest y service worker para instalar en el teléfono</label>
