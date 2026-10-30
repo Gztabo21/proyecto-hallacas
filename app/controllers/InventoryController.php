@@ -139,7 +139,7 @@ class InventoryController {
             'purchase_id' => $filters['purchase_id'] ?? null,
         ], static fn($v) => $v !== null && $v !== '');
         $page = pagination_page('p');
-        $per = 25;
+        $per = 29;
         $total = InventoryMovement::count($filters);
         $movements = InventoryMovement::all($filters, $per, ($page - 1) * $per);
         $products = InventoryProduct::all();

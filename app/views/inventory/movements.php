@@ -23,6 +23,15 @@ $jornadas = $jornadas ?? [];
 <p class="alert alert-light border py-2 small mb-2">Mostrando líneas de la compra/donación #<?= (int)$_GET['purchase_id'] ?>.</p>
 <?php endif; ?>
 <p class="text-muted small">En salidas y ajustes de cantidad a veces no hay precio en el movimiento; se muestra el último costo del producto marcado como <em>ref.</em></p>
+<?php
+$pl = $pagination['list'];
+$movPerPage = (int)$pl['per'];
+$movTotal = (int)$pl['total'];
+$movPage = (int)$pl['page'];
+$movFrom = $movTotal > 0 ? ($movPage - 1) * $movPerPage + 1 : 0;
+$movTo = min($movTotal, $movPage * $movPerPage);
+?>
+<p class="text-muted small mb-2"><?php if ($movTotal > 0): ?><strong><?= (int)$movFrom ?>–<?= (int)$movTo ?></strong> de <strong><?= $movTotal ?></strong> movimientos · <strong><?= $movPerPage ?></strong> líneas por página · página <?= $movPage ?><?php else: ?>Sin movimientos que mostrar<?php endif; ?></p>
 <form method="get" action="<?= url('inventory_movements') ?>" class="card p-3 mb-3">
   <input type="hidden" name="r" value="inventory_movements">
   <?php if (!empty($_GET['purchase_id'])): ?>
