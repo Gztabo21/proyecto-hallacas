@@ -61,6 +61,13 @@ function h($v): string {
 function money($v): string {
     return number_format((float)$v, 2, '.', ',');
 }
+
+function money_signed(float $v): string {
+    if (abs($v) < 0.0000001) {
+        return 'n/d';
+    }
+    return ($v < 0 ? '−' : '') . money(abs($v));
+}
 function flash(string $key, ?string $msg = null): ?string {
     if ($msg !== null) {
         $_SESSION['flash'][$key] = $msg;

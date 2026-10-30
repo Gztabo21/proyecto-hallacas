@@ -410,4 +410,32 @@ class InventoryMovement {
         }
         return ['bs' => $bs, 'usd' => $usd];
     }
+
+    /**
+     * Valor en Bs/USD con signo para totales: salida a jornada (+), excedente/devolución (−),
+     * entradas (+), ajuste según delta de cantidad.
+     *
+     * @param array<string,mixed> $movement
+     * @param array<int,array{precio_bs:?float,precio_usd:?float,tasa:?float}> $refByProduct
+     * @return array{bs:float,usd:float}
+     */
+    public static function signedLineAmounts(array $movement, array $refByProduct): array {
+        $line = self::lineTotalAmounts($movement, $refByProduct);
+        $tipo = (string)($movement['tipo'] ?? '');
+        if ($line['bs'] == 0.0 && $line['usd'] == 0.0) {
+            return $line;
+        }
+        if ($tipo === 'devolucion_jornada') {
+            return ['bs' => -abs($line['bs']), 'usd' => -abs($line['usd'])];
+        }
+        if ($tipo === 'salida_jornada') {
+            return ['bs' => abs($line['bs']), 'usd' => abs($line['usd'])];
+        }
+        if ($tipo === 'ajuste') {
+            $delta = self::deltaForTipo($tipo, (float)($movement['cantidad'] ?? 0));
+            $sign = $delta >= 0 ? 1.0 : -1.0;
+            return ['bs' => $sign * abs($line['bs']), 'usd' => $sign * abs($line['usd'])];
+        }
+        return ['bs' => abs($line['bs']), 'usd' => abs($line['usd'])];
+    }
 }

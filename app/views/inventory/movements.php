@@ -22,7 +22,7 @@ $jornadas = $jornadas ?? [];
 <?php if (!empty($_GET['purchase_id'])): ?>
 <p class="alert alert-light border py-2 small mb-2">Mostrando líneas de la compra/donación #<?= (int)$_GET['purchase_id'] ?>.</p>
 <?php endif; ?>
-<p class="text-muted small">En salidas y ajustes de cantidad a veces no hay precio en el movimiento; se muestra el último costo del producto marcado como <em>ref.</em></p>
+<p class="text-muted small">En salidas y ajustes de cantidad a veces no hay precio en el movimiento; se muestra el último costo del producto marcado como <em>ref.</em> El total en Bs/USD por fila y en el pie es <strong>neto</strong>: salidas a jornada suman, excedentes/devoluciones restan.</p>
 <?php
 $pl = $pagination['list'];
 $movPerPage = (int)$pl['per'];
@@ -85,9 +85,9 @@ $movTo = min($movTotal, $movPage * $movPerPage);
     $delta = InventoryMovement::deltaForTipo($m['tipo'], (float)$m['cantidad']);
     $sign = $delta >= 0 ? '+' : '−';
     $totDeltaCant += $delta;
-    $lineTotals = InventoryMovement::lineTotalAmounts($m, $refCostByProduct);
+    $lineTotals = InventoryMovement::signedLineAmounts($m, $refCostByProduct);
     $totLineBs += $lineTotals['bs'];
-    if ($lineTotals['usd'] > 0) {
+    if (abs($lineTotals['usd']) > 0) {
       $totLineUsd += $lineTotals['usd'];
       $totHasUsd = true;
     }
@@ -112,8 +112,8 @@ $movTo = min($movTotal, $movPage * $movPerPage);
       <td class="text-end"><?= ($totDeltaCant >= 0 ? '+' : '−') . h(rtrim(rtrim(number_format(abs($totDeltaCant), 3, '.', ''), '0'), '.')) ?></td>
       <td></td>
       <td></td>
-      <td class="text-end"><?= $totLineBs > 0 ? money($totLineBs) : 'n/d' ?></td>
-      <td class="text-end"><?= $totHasUsd ? money($totLineUsd) : 'n/d' ?></td>
+      <td class="text-end"><?= money_signed($totLineBs) ?></td>
+      <td class="text-end"><?= $totHasUsd ? money_signed($totLineUsd) : 'n/d' ?></td>
       <td colspan="3"></td>
     </tr>
   </tfoot>

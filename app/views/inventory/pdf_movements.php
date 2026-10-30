@@ -33,6 +33,7 @@
   <?php else: foreach ($movements as $m):
     $delta = InventoryMovement::deltaForTipo($m['tipo'], (float)$m['cantidad']);
     $sign = $delta >= 0 ? '+' : '−';
+    $lineTotals = InventoryMovement::signedLineAmounts($m, $refCostByProduct ?? []);
   ?>
   <tr>
     <td><?= h($m['fecha_ingreso']) ?></td>
