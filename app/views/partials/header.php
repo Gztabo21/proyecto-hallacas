@@ -7,6 +7,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <?php $cssPath = PUBLIC_PATH . '/assets/css/app.css'; $cssVer = is_file($cssPath) ? (string)filemtime($cssPath) : '1'; ?>
   <link rel="stylesheet" href="<?= h(asset('assets/css/app.css')) ?>?v=<?= h($cssVer) ?>">
+  <?php include BASE_PATH . '/app/views/partials/pwa_head.php'; ?>
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">

@@ -119,7 +119,9 @@ class Entrega {
         if ($groupBy !== null) {
             $sql .= ' e.' . $groupBy . ',';
         }
-        $sql .= ' COALESCE(SUM(e.hallacas_entregadas * e.precio_unitario), 0) AS general,
+        $sql .= ' COALESCE(SUM(e.hallacas_entregadas), 0) AS hallacas_entregadas,
+                  COALESCE(SUM(e.hallacas_pagadas), 0) AS hallacas_pagadas,
+                  COALESCE(SUM(e.hallacas_entregadas * e.precio_unitario), 0) AS general,
                   COALESCE(SUM(COALESCE(pc.pagado_confirmado, 0)), 0) AS pagado
                   FROM entregas e
                   LEFT JOIN (
@@ -133,27 +135,29 @@ class Entrega {
         }
         $rows = DB::query($sql, $params)->fetchAll();
         if ($groupBy === null) {
-            $row = $rows[0] ?? ['general' => 0, 'pagado' => 0];
-            $general = (float)($row['general'] ?? 0);
-            $pagado = (float)($row['pagado'] ?? 0);
-            return [
-                'general' => $general,
-                'pagado' => $pagado,
-                'pendiente' => max(0.0, $general - $pagado),
-            ];
+            $row = $rows[0] ?? [];
+            return self::normalizeMoneyAggregateRow($row);
         }
         $map = [];
         foreach ($rows as $row) {
             $key = (int)$row[$groupBy];
-            $general = (float)($row['general'] ?? 0);
-            $pagado = (float)($row['pagado'] ?? 0);
-            $map[$key] = [
-                'general' => $general,
-                'pagado' => $pagado,
-                'pendiente' => max(0.0, $general - $pagado),
-            ];
+            $map[$key] = self::normalizeMoneyAggregateRow($row);
         }
         return $map;
+    }
+
+    /** @param array<string,mixed> $row */
+    private static function normalizeMoneyAggregateRow(array $row): array {
+        $general = (float)($row['general'] ?? 0);
+        $pagado = (float)($row['pagado'] ?? 0);
+        $pendiente = max(0.0, $general - $pagado);
+        return [
+            'hallacas_entregadas' => (int)($row['hallacas_entregadas'] ?? 0),
+            'hallacas_pagadas' => (int)($row['hallacas_pagadas'] ?? 0),
+            'general' => $general,
+            'pagado' => $pagado,
+            'pendiente' => $pendiente,
+        ];
     }
 
     /** @return array{general: float, pagado: float, pendiente: float} */

@@ -1,15 +1,30 @@
 <?php
 class InventoryProduct {
+    /** Fragmento ORDER BY: SKU numérico en orden natural, luego alfanuméricos. */
+    public static function sqlOrderBySku(string $prefix = '', string $dir = 'ASC'): string {
+        $dir = strtoupper($dir) === 'DESC' ? 'DESC' : 'ASC';
+        $s = $prefix;
+        return "CASE WHEN {$s}sku REGEXP '^[0-9]+\$' THEN 0 ELSE 1 END ASC,
+                CASE WHEN {$s}sku REGEXP '^[0-9]+\$' THEN CAST({$s}sku AS UNSIGNED) END {$dir},
+                {$s}sku {$dir},
+                {$s}name ASC";
+    }
+
     public static function all(): array {
-        return DB::query('SELECT * FROM inventory_products ORDER BY name')->fetchAll();
+        return DB::query(
+            'SELECT * FROM inventory_products ORDER BY ' . self::sqlOrderBySku('', 'ASC')
+        )->fetchAll();
     }
 
     /** Catálogo con último precio/tasa/fecha registrados en movimientos de entrada o ajuste con costo. */
-    public static function allForIndex(string $sort = 'name', string $dir = 'asc'): array {
+    public static function allForIndex(string $sort = 'sku', string $dir = 'asc'): array {
         $sort = $sort === 'sku' ? 'sku' : 'name';
         $dirSql = strtolower($dir) === 'desc' ? 'DESC' : 'ASC';
-        $primary = $sort === 'sku' ? 'p.sku' : 'p.name';
-        $secondary = $sort === 'sku' ? 'p.name ASC' : 'p.sku ASC';
+        if ($sort === 'sku') {
+            $orderBy = self::sqlOrderBySku('p.', $dirSql);
+        } else {
+            $orderBy = "p.name {$dirSql}, " . self::sqlOrderBySku('p.', 'ASC');
+        }
         return DB::query(
             "SELECT p.*,
                     lm.precio_bs AS ultimo_precio_bs,
@@ -24,7 +39,7 @@ class InventoryProduct {
                ORDER BY m.fecha_ingreso DESC, m.id DESC
                LIMIT 1
              )
-             ORDER BY {$primary} {$dirSql}, {$secondary}"
+             ORDER BY {$orderBy}"
         )->fetchAll();
     }
 

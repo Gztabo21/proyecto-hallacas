@@ -14,6 +14,7 @@
   ?>
   <link rel="stylesheet" href="<?= h(asset('assets/css/app.css')) ?>?v=<?= h($cssVer) ?>">
   <style>:root { --login-bg-url: url('<?= h($bgUrl) ?>'); }</style>
+  <?php include BASE_PATH . '/app/views/partials/pwa_head.php'; ?>
 </head>
 <body class="login-page d-flex flex-column min-vh-100">
 <header class="login-top py-3">

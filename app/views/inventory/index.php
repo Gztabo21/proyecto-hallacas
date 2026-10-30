@@ -12,7 +12,7 @@ $inventoryUsd = static function (array $p): ?float {
     }
     return null;
 };
-$inventorySort = $inventorySort ?? 'name';
+$inventorySort = $inventorySort ?? 'sku';
 $inventorySortDir = $inventorySortDir ?? 'asc';
 $invSortLink = static function (string $col, string $label) use ($inventorySort, $inventorySortDir): string {
     $nextDir = ($inventorySort === $col && $inventorySortDir === 'asc') ? 'desc' : 'asc';

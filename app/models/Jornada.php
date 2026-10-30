@@ -24,6 +24,19 @@ class Jornada {
         $r = DB::query('SELECT COALESCE(SUM(hallacas_entregadas),0) AS s FROM entregas WHERE jornada_id=?', [$jornadaId])->fetch();
         return (int)$r['s'];
     }
+
+    /** Total de hallacas hechas registrado en la jornada, o null si no se indicó. */
+    public static function totalHechasFromRow(array $jornada): ?int {
+        if (!isset($jornada['total_hallacas_hechas']) || $jornada['total_hallacas_hechas'] === null || $jornada['total_hallacas_hechas'] === '') {
+            return null;
+        }
+        return max(0, (int)$jornada['total_hallacas_hechas']);
+    }
+
+    public static function totalHechas(int $jornadaId): ?int {
+        $j = self::find($jornadaId);
+        return $j ? self::totalHechasFromRow($j) : null;
+    }
     public static function setTotalHallacasHechas(int $id, ?int $total): void {
         DB::query('UPDATE jornadas SET total_hallacas_hechas=? WHERE id=?', [$total, $id]);
     }

@@ -15,7 +15,7 @@ $sobreAsignado = $totalHechas !== null && $totalAsignadasJornada > $totalHechas;
 page_back('jornadas', 'Volver a jornadas');
 ?>
 <h2><?= h($jornada['name']) ?> <small class="text-muted">(<?= h($jornada['fecha']) ?>)</small> <?= status_badge($jornada['status']) ?></h2>
-<p>Precio por hallaca: <strong><?= money($precio) ?></strong> <?= $jornada['notes'] ? ' - '.h($jornada['notes']) : '' ?></p>
+<p>Precio por hallaca (USD): <strong><?= money($precio) ?></strong> <?= $jornada['notes'] ? ' - '.h($jornada['notes']) : '' ?></p>
 
 <div class="card mb-3 border-secondary">
   <div class="card-body py-3">
@@ -732,7 +732,33 @@ include BASE_PATH . '/app/views/payments/_panel.php';
   <div class="card-body">
     <?php if (empty($inventoryTablesReady)): ?>
     <div class="alert alert-warning mb-0">Falta instalar las tablas de inventario. Ejecute <code>sql/003_inventory.sql</code> en MySQL o abra <a href="<?= url('inventory') ?>">Inventario</a> para ver las instrucciones.</div>
-    <?php else: ?>
+    <?php else:
+    $inventoryCostByProduct = $inventoryCostByProduct ?? [];
+    $jornadaInvSubLabels = [
+        'entrega' => 'Entregar ingredientes',
+        'salidas' => 'Salidas registradas',
+        'balance' => 'Balance y devoluciones',
+    ];
+    $jornadaInvSubReq = (string)($_GET['inv_sub'] ?? '');
+    $jornadaInvSub = isset($jornadaInvSubLabels[$jornadaInvSubReq]) ? $jornadaInvSubReq : 'entrega';
+    $jornadaInvSubUrl = static function (string $sub) use ($jornada): string {
+        return url('jornada_show', ['id' => (int)$jornada['id'], 'tab' => 'inventario', 'inv_sub' => $sub]);
+    };
+    $salidasCount = 0;
+    foreach ($jornadaInventoryOut as $joCount) {
+        if (($joCount['tipo'] ?? '') === 'salida_jornada') {
+            $salidasCount++;
+        }
+    }
+    ?>
+    <ul class="nav nav-tabs mb-3 flex-nowrap overflow-auto">
+      <?php foreach ($jornadaInvSubLabels as $invKey => $invLabel): ?>
+      <li class="nav-item">
+        <a class="nav-link text-nowrap <?= $jornadaInvSub === $invKey ? 'active' : '' ?>" href="<?= h($jornadaInvSubUrl($invKey)) ?>"><?= h($invLabel) ?><?php if ($invKey === 'salidas' && $salidasCount > 0): ?> <span class="badge text-bg-secondary"><?= (int)$salidasCount ?></span><?php endif; ?></a>
+      </li>
+      <?php endforeach; ?>
+    </ul>
+    <?php if ($jornadaInvSub === 'entrega'): ?>
     <p class="text-muted small">Al entregar ingredientes a esta jornada se registra una <strong>salida</strong> de stock y queda en el historial.</p>
     <form method="post" action="<?= url('inventory_jornada_deliver') ?>">
       <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
@@ -771,18 +797,37 @@ include BASE_PATH . '/app/views/payments/_panel.php';
       <button class="btn btn-sm btn-warning">Registrar salida a jornada</button>
       <?php endif; ?>
     </form>
-    <?php if (!empty($jornadaInventoryOut)): ?>
-    <h6 class="mt-3 mb-2">Salidas registradas en esta jornada</h6>
-    <div class="table-responsive">
+    <?php elseif ($jornadaInvSub === 'salidas'): ?>
     <?php $canEditJornadaSalidas = Auth::canManageJornadaInventory((int)$jornada['id']); ?>
+    <p class="text-muted small mb-2">Precio unitario en Bs. según el movimiento o, si no hay costo en la salida, el <strong>último precio</strong> del catálogo (<span class="text-muted">ref.</span>).</p>
+    <?php if ($salidasCount === 0): ?>
+    <p class="text-muted mb-0">No hay salidas registradas. Use la pestaña «Entregar ingredientes».</p>
+    <?php else: ?>
+    <div class="table-responsive">
     <table class="table table-sm table-striped mb-0">
-      <thead><tr><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Registrado por</th><?php if ($canEditJornadaSalidas): ?><th class="text-end" style="width:8rem">Acciones</th><?php endif; ?></tr></thead>
+      <thead><tr><th>Fecha</th><th>Producto</th><th>Cantidad</th><th class="text-end">Precio unit. (Bs)</th><th class="text-end">Total (Bs)</th><th>Registrado por</th><?php if ($canEditJornadaSalidas): ?><th class="text-end" style="width:8rem">Acciones</th><?php endif; ?></tr></thead>
       <tbody>
-      <?php foreach ($jornadaInventoryOut as $jo): if ($jo['tipo'] !== 'salida_jornada') continue; ?>
+      <?php
+      $totSalidasBs = 0.0;
+      $totSalidasConPrecio = 0;
+      foreach ($jornadaInventoryOut as $jo):
+        if (($jo['tipo'] ?? '') !== 'salida_jornada') {
+            continue;
+        }
+        $lineTotals = InventoryMovement::lineTotalAmounts($jo, $inventoryCostByProduct);
+        $price = InventoryMovement::displayUnitPrice($jo, $inventoryCostByProduct);
+        $refSuffix = !empty($price['is_ref']) ? ' <span class="text-muted small">ref.</span>' : '';
+        if ($lineTotals['bs'] > 0) {
+            $totSalidasBs += $lineTotals['bs'];
+            $totSalidasConPrecio++;
+        }
+      ?>
       <tr>
         <td><?= h($jo['fecha_ingreso']) ?></td>
         <td><?= h($jo['product_name']) ?></td>
         <td><?= h(rtrim(rtrim(number_format((float)$jo['cantidad'], 3, '.', ''), '0'), '.')) ?> <?= h($jo['unidad_metrica']) ?></td>
+        <td class="text-end"><?= ($price['precio_bs'] !== null && $price['precio_bs'] > 0) ? money($price['precio_bs']) . $refSuffix : 'n/d' ?></td>
+        <td class="text-end"><?= $lineTotals['bs'] > 0 ? money($lineTotals['bs']) . $refSuffix : 'n/d' ?></td>
         <td><?= h($jo['created_by_name'] ?? '—') ?></td>
         <?php if ($canEditJornadaSalidas): ?>
         <td class="text-end text-nowrap">
@@ -804,6 +849,13 @@ include BASE_PATH . '/app/views/payments/_panel.php';
       </tr>
       <?php endforeach; ?>
       </tbody>
+      <tfoot>
+      <tr class="table-light">
+        <td colspan="4" class="text-end fw-semibold">Total salidas (Bs)</td>
+        <td class="text-end fw-semibold"><?= money($totSalidasBs) ?></td>
+        <td colspan="<?= $canEditJornadaSalidas ? 2 : 1 ?>" class="text-muted small"><?php if ($totSalidasConPrecio < $salidasCount): ?>Incluye solo líneas con precio; <?= (int)($salidasCount - $totSalidasConPrecio) ?> sin costo en catálogo.<?php endif; ?></td>
+      </tr>
+      </tfoot>
     </table>
     </div>
     <?php if ($canEditJornadaSalidas): ?>
@@ -853,12 +905,14 @@ include BASE_PATH . '/app/views/payments/_panel.php';
     <?php endif; ?>
     <?php endif; ?>
 
+    <?php elseif ($jornadaInvSub === 'balance'): ?>
     <?php
     $balanceRows = array_values($jornadaInventoryBalance ?? []);
     $returnable = array_filter($balanceRows, static fn($b) => ($b['pendiente_devolver'] ?? 0) > 0.0001);
     ?>
-    <?php if (!empty($balanceRows)): ?>
-    <hr class="my-3">
+    <?php if (empty($balanceRows)): ?>
+    <p class="text-muted mb-0">Aún no hay entregas ni devoluciones registradas en esta jornada.</p>
+    <?php else: ?>
     <h6 class="mb-2">Excedentes / devolución a almacén</h6>
     <p class="text-muted small mb-2">Lo no devuelto se considera <strong>consumido en jornada</strong> (entregado − devuelto). Al registrar excedentes, el stock vuelve al almacén.</p>
     <div class="table-responsive mb-3">
@@ -910,6 +964,7 @@ include BASE_PATH . '/app/views/payments/_panel.php';
       </div>
       <button class="btn btn-sm btn-success">Registrar excedentes en almacén</button>
     </form>
+    <?php endif; ?>
     <?php endif; ?>
     <?php endif; ?>
     <?php endif; ?>

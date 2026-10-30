@@ -106,7 +106,7 @@ class InventoryController {
 
     /** @return array{0: string, 1: string} */
     private static function parseIndexSort(): array {
-        $sort = (string)($_GET['sort'] ?? 'name');
+        $sort = (string)($_GET['sort'] ?? 'sku');
         if (!in_array($sort, ['name', 'sku'], true)) {
             $sort = 'name';
         }
@@ -619,16 +619,16 @@ class InventoryController {
             }
         } catch (Throwable $e) {
             flash('error', $e->getMessage());
-            redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario']);
+            redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario', 'inv_sub' => 'entrega']);
             return;
         }
         if ($done === 0) {
             flash('error', 'Indique al menos un producto y cantidad');
-            redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario']);
+            redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario', 'inv_sub' => 'entrega']);
             return;
         }
         flash('success', 'Salida de inventario registrada para la jornada');
-        redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario']);
+        redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario', 'inv_sub' => 'salidas']);
     }
 
     public static function jornadaSalidaUpdate(): void {
@@ -643,7 +643,7 @@ class InventoryController {
         $mov = InventoryMovement::find($movId);
         if (!$mov || (int)($mov['jornada_id'] ?? 0) !== $jid) {
             flash('error', 'Salida no encontrada');
-            redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario']);
+            redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario', 'inv_sub' => 'salidas']);
             return;
         }
         $cantidad = (float)($_POST['cantidad'] ?? 0);
@@ -651,7 +651,7 @@ class InventoryController {
         $notes = trim((string)($_POST['notes'] ?? ''));
         if ($fecha === '') {
             flash('error', 'Indique la fecha');
-            redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario']);
+            redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario', 'inv_sub' => 'salidas']);
             return;
         }
         try {
@@ -660,7 +660,7 @@ class InventoryController {
         } catch (Throwable $e) {
             flash('error', $e->getMessage());
         }
-        redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario']);
+        redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario', 'inv_sub' => 'salidas']);
     }
 
     public static function jornadaSalidaDelete(): void {
@@ -675,7 +675,7 @@ class InventoryController {
         $mov = InventoryMovement::find($movId);
         if (!$mov || (int)($mov['jornada_id'] ?? 0) !== $jid) {
             flash('error', 'Salida no encontrada');
-            redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario']);
+            redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario', 'inv_sub' => 'salidas']);
             return;
         }
         try {
@@ -684,7 +684,7 @@ class InventoryController {
         } catch (Throwable $e) {
             flash('error', $e->getMessage());
         }
-        redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario']);
+        redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario', 'inv_sub' => 'salidas']);
     }
 
     public static function jornadaReturnStore(): void {
@@ -731,16 +731,16 @@ class InventoryController {
             }
         } catch (Throwable $e) {
             flash('error', $e->getMessage());
-            redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario']);
+            redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario', 'inv_sub' => 'balance']);
             return;
         }
         if ($done === 0) {
             flash('error', 'Indique al menos un producto y cantidad a devolver');
-            redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario']);
+            redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario', 'inv_sub' => 'balance']);
             return;
         }
         flash('success', 'Excedentes registrados; stock actualizado en almacén');
-        redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario']);
+        redirect('jornada_show', ['id' => $jid, 'tab' => 'inventario', 'inv_sub' => 'balance']);
     }
 
     private static function storeEntryMovement(string $tipo, string $redirectRoute): void {

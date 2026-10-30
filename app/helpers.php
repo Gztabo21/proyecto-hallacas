@@ -19,6 +19,33 @@ function asset(string $path): string {
     return ($base !== '' ? $base . '/' : '/') . $path;
 }
 
+function pwa_scope(): string {
+    $base = asset('');
+    if ($base === '/' || $base === '') {
+        return '/';
+    }
+    return rtrim($base, '/') . '/';
+}
+
+function pwa_is_enabled(): bool {
+    static $enabled = null;
+    if ($enabled !== null) {
+        return $enabled;
+    }
+    $env = getenv('PWA_ENABLED');
+    if ($env !== false && $env !== '') {
+        $enabled = !in_array(strtolower($env), ['0', 'false', 'no', 'off'], true);
+        return $enabled;
+    }
+    $db = setting('pwa_enabled', '1');
+    $enabled = $db === '1' || $db === 'true';
+    return $enabled;
+}
+
+function pwa_theme_color(): string {
+    return '#212529';
+}
+
 function url(string $route = '', array $params = []): string {
     $q = array_merge(['r' => $route], $params);
     if ($route === '') unset($q['r']);

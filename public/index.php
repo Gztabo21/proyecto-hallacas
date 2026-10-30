@@ -15,6 +15,7 @@ require_once __DIR__ . '/../app/controllers/PaymentController.php';
 require_once __DIR__ . '/../app/controllers/InventoryController.php';
 require_once __DIR__ . '/../app/controllers/RolePermissionController.php';
 require_once __DIR__ . '/../app/controllers/ProductionController.php';
+require_once __DIR__ . '/../app/controllers/PwaController.php';
 
 $route = $_GET['r'] ?? '';
 
@@ -304,6 +305,9 @@ switch ($route) {
         break;
     case 'inventory_purchase_donations_import':
         InventoryController::purchaseDonationsImportStore();
+        break;
+    case 'pwa_settings_store':
+        PwaController::settingsStore();
         break;
     default:
         http_response_code(404);

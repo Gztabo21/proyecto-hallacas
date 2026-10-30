@@ -28,19 +28,45 @@ class JornadaController {
             $where = 'WHERE 1=1';
             $params = [];
         }
-        $totals = Entrega::aggregateMoneyTotals($where, $params);
-        $totalesGeneral = (float)$totals['general'];
-        $totalesPagado = (float)$totals['pagado'];
-        $totalesPendiente = (float)$totals['pendiente'];
-
         $aggMap = Entrega::aggregateMoneyByJornada($where, $params);
         foreach ($jornadas as &$j) {
-            $a = $aggMap[(int)$j['id']] ?? ['general' => 0.0, 'pagado' => 0.0, 'pendiente' => 0.0];
+            $a = $aggMap[(int)$j['id']] ?? [
+                'general' => 0.0,
+                'pagado' => 0.0,
+                'pendiente' => 0.0,
+                'hallacas_entregadas' => 0,
+                'hallacas_pagadas' => 0,
+            ];
             $j['general'] = (float)$a['general'];
             $j['pagado'] = (float)$a['pagado'];
             $j['pendiente'] = (float)$a['pendiente'];
+            $j['hallacas_entregadas'] = (int)$a['hallacas_entregadas'];
+            $j['hallacas_pagadas'] = (int)$a['hallacas_pagadas'];
+            $precio = (float)($j['precio_hallaca'] ?? 0);
+            $hechas = Jornada::totalHechasFromRow($j);
+            $j['hallacas_realizadas'] = $hechas;
+            $j['valor_producido_bs'] = ($hechas !== null && $precio > 0) ? round($hechas * $precio, 2) : null;
         }
         unset($j);
+
+        // Totales de las tarjetas = suma de las filas visibles (siempre cuadra con la tabla).
+        $totalesGeneral = 0.0;
+        $totalesPagado = 0.0;
+        $totalesPendiente = 0.0;
+        $totalesHallacasEntregadas = 0;
+        $totalesHallacasRealizadas = 0;
+        $jornadasSinTotalHechas = 0;
+        foreach ($jornadas as $j) {
+            $totalesGeneral += (float)($j['general'] ?? 0);
+            $totalesPagado += (float)($j['pagado'] ?? 0);
+            $totalesPendiente += (float)($j['pendiente'] ?? 0);
+            $totalesHallacasEntregadas += (int)($j['hallacas_entregadas'] ?? 0);
+            if ($j['hallacas_realizadas'] !== null) {
+                $totalesHallacasRealizadas += (int)$j['hallacas_realizadas'];
+            } else {
+                $jornadasSinTotalHechas++;
+            }
+        }
 
         include BASE_PATH . '/app/views/jornadas/index.php';
     }
@@ -90,6 +116,7 @@ class JornadaController {
         $inventoryProducts = [];
         $jornadaInventoryOut = [];
         $jornadaInventoryBalance = [];
+        $inventoryCostByProduct = [];
         $inventoryTablesReady = false;
         if (Auth::canAccessInventory()) {
             try {
@@ -98,6 +125,7 @@ class JornadaController {
                 $inventoryProducts = InventoryProduct::all();
                 $jornadaInventoryOut = InventoryMovement::byJornada($id);
                 $jornadaInventoryBalance = InventoryMovement::balanceByJornada($id);
+                $inventoryCostByProduct = InventoryMovement::latestCostByProduct();
             } catch (PDOException $e) {
                 $inventoryTablesReady = false;
             }

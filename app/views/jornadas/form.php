@@ -20,7 +20,7 @@ if ($isEdit) {
     <input type="date" name="fecha" class="form-control" required value="<?= h($j['fecha'] ?? date('Y-m-d')) ?>">
   </div>
   <div class="mb-3">
-    <label class="form-label">Precio por hallaca</label>
+    <label class="form-label">Precio por hallaca (USD)</label>
     <input type="number" step="0.01" name="precio_hallaca" class="form-control" value="<?= h($j['precio_hallaca'] ?? setting('precio_hallaca', DEFAULT_PRICE)) ?>">
   </div>
   <div class="mb-3">

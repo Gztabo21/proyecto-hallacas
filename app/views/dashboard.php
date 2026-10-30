@@ -1,5 +1,21 @@
 <?php include BASE_PATH . '/app/views/partials/header.php'; ?>
 <h2>Dashboard</h2>
+<?php if (Auth::isAdmin()): ?>
+<div class="card mb-3">
+  <div class="card-header py-2"><h5 class="mb-0">App instalable (PWA)</h5></div>
+  <div class="card-body">
+    <form method="post" action="<?= url('pwa_settings_store') ?>">
+      <?= csrf_field() ?>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="pwa_enabled" value="1" id="pwa_enabled"<?= pwa_is_enabled() ? ' checked' : '' ?>>
+        <label class="form-check-label" for="pwa_enabled">Activar manifest y service worker para instalar en el teléfono</label>
+      </div>
+      <button type="submit" class="btn btn-sm btn-primary mt-2">Guardar</button>
+      <p class="text-muted small mb-0 mt-2">En producción hace falta HTTPS. Si define <code>PWA_ENABLED=0</code> en <code>.env</code>, desactiva la PWA aunque el interruptor esté encendido.</p>
+    </form>
+  </div>
+</div>
+<?php endif; ?>
 <div class="row mb-3 g-3">
   <div class="col-md-3"><div class="card h-100"><div class="card-body"><h6>Misiones activas</h6><h3><?= (int)$stats['misiones'] ?></h3></div></div></div>
   <div class="col-md-3"><div class="card h-100"><div class="card-body"><h6>Jornadas</h6><h3><?= (int)$stats['jornadas'] ?></h3></div></div></div>
