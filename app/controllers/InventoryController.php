@@ -36,6 +36,7 @@ class InventoryController {
         try {
             DB::query('SELECT 1 FROM inventory_products LIMIT 1');
             self::ensurePurchaseColumns();
+            InventoryMovement::ensureJornadaCostsFrozen();
             $ready = true;
             return true;
         } catch (PDOException $e) {

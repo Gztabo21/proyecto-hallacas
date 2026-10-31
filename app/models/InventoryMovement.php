@@ -88,6 +88,98 @@ class InventoryMovement {
         return round($precioBs / $tasa, 4);
     }
 
+    /** @param array<string,mixed> $data */
+    public static function dataHasExplicitPrice(array $data): bool {
+        $bs = isset($data['precio_bs']) && $data['precio_bs'] !== '' && $data['precio_bs'] !== null
+            ? (float)$data['precio_bs'] : 0.0;
+        $usd = isset($data['precio_usd']) && $data['precio_usd'] !== '' && $data['precio_usd'] !== null
+            ? (float)$data['precio_usd'] : 0.0;
+        return $bs > 0 || $usd > 0;
+    }
+
+    /**
+     * Último costo unitario conocido para un producto en o antes de una fecha;
+     * con $beforeMovementId excluye movimientos posteriores el mismo día (p. ej. compras después de la salida).
+     *
+     * @return array{precio_bs:?float,precio_usd:?float,tasa:?float}|null
+     */
+    public static function costAsOf(int $productId, string $fechaIngreso, ?int $beforeMovementId = null): ?array {
+        if ($productId <= 0 || $fechaIngreso === '') {
+            return null;
+        }
+        $beforeId = ($beforeMovementId === null || $beforeMovementId <= 0) ? PHP_INT_MAX : $beforeMovementId;
+        $row = DB::query(
+            'SELECT precio_bs, precio_usd, tasa FROM inventory_movements
+             WHERE product_id = ?
+               AND (precio_bs IS NOT NULL OR precio_usd IS NOT NULL OR (tasa IS NOT NULL AND tasa > 0))
+               AND (fecha_ingreso < ? OR (fecha_ingreso = ? AND id < ?))
+             ORDER BY fecha_ingreso DESC, id DESC
+             LIMIT 1',
+            [$productId, $fechaIngreso, $fechaIngreso, $beforeId]
+        )->fetch();
+        if (!$row) {
+            return null;
+        }
+        $bs = $row['precio_bs'] !== null && $row['precio_bs'] !== '' ? (float)$row['precio_bs'] : null;
+        $usd = $row['precio_usd'] !== null && $row['precio_usd'] !== '' ? (float)$row['precio_usd'] : null;
+        $tasa = $row['tasa'] !== null && $row['tasa'] !== '' ? (float)$row['tasa'] : null;
+        if (($bs === null || $bs <= 0) && ($usd === null || $usd <= 0)) {
+            return null;
+        }
+        if (($usd === null || $usd <= 0) && $bs !== null && $bs > 0 && $tasa !== null && $tasa > 0) {
+            $usd = self::usdFromBs($bs, $tasa);
+        }
+        return ['precio_bs' => $bs, 'precio_usd' => $usd, 'tasa' => $tasa];
+    }
+
+    /** Congela precio_bs/tasa en salidas y devoluciones de jornada que aún no tienen costo. */
+    public static function backfillJornadaMovementCosts(): int {
+        $rows = DB::query(
+            'SELECT id, product_id, fecha_ingreso FROM inventory_movements
+             WHERE tipo IN ("salida_jornada", "devolucion_jornada")
+               AND (precio_bs IS NULL OR precio_bs <= 0)
+               AND (precio_usd IS NULL OR precio_usd <= 0)'
+        )->fetchAll();
+        $updated = 0;
+        foreach ($rows as $r) {
+            $snap = self::costAsOf((int)$r['product_id'], (string)$r['fecha_ingreso'], (int)$r['id']);
+            if (!$snap || (($snap['precio_bs'] ?? 0) <= 0 && ($snap['precio_usd'] ?? 0) <= 0)) {
+                continue;
+            }
+            $bs = $snap['precio_bs'];
+            $tasa = $snap['tasa'];
+            $usd = $snap['precio_usd'];
+            if ($usd === null && $bs !== null && $tasa !== null && $tasa > 0) {
+                $usd = self::usdFromBs($bs, $tasa);
+            }
+            DB::query(
+                'UPDATE inventory_movements SET precio_bs = ?, precio_usd = ?, tasa = ? WHERE id = ?',
+                [$bs, $usd, $tasa, (int)$r['id']]
+            );
+            $updated++;
+        }
+        return $updated;
+    }
+
+    public static function ensureJornadaCostsFrozen(): void {
+        static $ran = false;
+        if ($ran) {
+            return;
+        }
+        $ran = true;
+        if (setting('inventory_jornada_cost_frozen', '') === '1') {
+            return;
+        }
+        try {
+            self::backfillJornadaMovementCosts();
+            set_setting('inventory_jornada_cost_frozen', '1');
+        } catch (Throwable $e) {
+            if (APP_DEBUG) {
+                error_log('ensureJornadaCostsFrozen: ' . $e->getMessage());
+            }
+        }
+    }
+
     /** @return int movement id */
     public static function register(array $data): int {
         $tipo = $data['tipo'];
@@ -98,12 +190,26 @@ class InventoryMovement {
         if ($delta < 0 && $stock + $delta < -0.0001) {
             throw new InvalidArgumentException('Stock insuficiente para el producto.');
         }
-        $precioBs = isset($data['precio_bs']) ? (float)$data['precio_bs'] : null;
-        $tasa = isset($data['tasa']) ? (float)$data['tasa'] : null;
+        if (in_array($tipo, ['salida_jornada', 'devolucion_jornada'], true) && !self::dataHasExplicitPrice($data)) {
+            $snap = self::costAsOf($productId, (string)($data['fecha_ingreso'] ?? ''), null);
+            if ($snap) {
+                if (($snap['precio_bs'] ?? 0) > 0) {
+                    $data['precio_bs'] = $snap['precio_bs'];
+                }
+                if (($snap['tasa'] ?? 0) > 0) {
+                    $data['tasa'] = $snap['tasa'];
+                }
+                if (($snap['precio_usd'] ?? 0) > 0) {
+                    $data['precio_usd'] = $snap['precio_usd'];
+                }
+            }
+        }
+        $precioBs = isset($data['precio_bs']) && $data['precio_bs'] !== '' ? (float)$data['precio_bs'] : null;
+        $tasa = isset($data['tasa']) && $data['tasa'] !== '' ? (float)$data['tasa'] : null;
         $precioUsd = null;
         if ($precioBs !== null && $tasa !== null && $tasa > 0) {
             $precioUsd = self::usdFromBs($precioBs, $tasa);
-        } elseif (isset($data['precio_usd'])) {
+        } elseif (isset($data['precio_usd']) && $data['precio_usd'] !== '') {
             $precioUsd = (float)$data['precio_usd'];
         }
 
@@ -371,6 +477,17 @@ class InventoryMovement {
             return ['precio_bs' => $bs, 'precio_usd' => $usd, 'tasa' => $tasa, 'is_ref' => false];
         }
         $pid = (int)($movement['product_id'] ?? 0);
+        $fecha = (string)($movement['fecha_ingreso'] ?? '');
+        $movId = isset($movement['id']) ? (int)$movement['id'] : 0;
+        $asOf = self::costAsOf($pid, $fecha, $movId > 0 ? $movId : null);
+        if ($asOf) {
+            return [
+                'precio_bs' => $asOf['precio_bs'],
+                'precio_usd' => $asOf['precio_usd'],
+                'tasa' => $asOf['tasa'],
+                'is_ref' => true,
+            ];
+        }
         $ref = $refByProduct[$pid] ?? null;
         if (!$ref) {
             return ['precio_bs' => null, 'precio_usd' => null, 'tasa' => null, 'is_ref' => false];

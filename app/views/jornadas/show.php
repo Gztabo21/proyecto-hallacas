@@ -799,7 +799,7 @@ include BASE_PATH . '/app/views/payments/_panel.php';
     </form>
     <?php elseif ($jornadaInvSub === 'salidas'): ?>
     <?php $canEditJornadaSalidas = Auth::canManageJornadaInventory((int)$jornada['id']); ?>
-    <p class="text-muted small mb-2">Precio unitario en Bs. según el movimiento o, si no hay costo en la salida, el <strong>último precio</strong> del catálogo (<span class="text-muted">ref.</span>).</p>
+    <p class="text-muted small mb-2">Precio unitario en Bs. <strong>congelado</strong> al registrar la salida (costo vigente en esa fecha). Las compras posteriores no cambian estas líneas.</p>
     <?php if ($salidasCount === 0): ?>
     <p class="text-muted mb-0">No hay salidas registradas. Use la pestaña «Entregar ingredientes».</p>
     <?php else: ?>

@@ -122,6 +122,7 @@ class JornadaController {
             try {
                 DB::query('SELECT 1 FROM inventory_products LIMIT 1');
                 $inventoryTablesReady = true;
+                InventoryMovement::ensureJornadaCostsFrozen();
                 $inventoryProducts = InventoryProduct::all();
                 $jornadaInventoryOut = InventoryMovement::byJornada($id);
                 $jornadaInventoryBalance = InventoryMovement::balanceByJornada($id);

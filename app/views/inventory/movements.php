@@ -22,7 +22,7 @@ $jornadas = $jornadas ?? [];
 <?php if (!empty($_GET['purchase_id'])): ?>
 <p class="alert alert-light border py-2 small mb-2">Mostrando líneas de la compra/donación #<?= (int)$_GET['purchase_id'] ?>.</p>
 <?php endif; ?>
-<p class="text-muted small">En salidas y ajustes de cantidad a veces no hay precio en el movimiento; se muestra el último costo del producto marcado como <em>ref.</em> El total en Bs/USD por fila y en el pie es <strong>neto</strong>: salidas a jornada suman, excedentes/devoluciones restan.</p>
+<p class="text-muted small">Salidas y devoluciones de jornada guardan el costo de su fecha; <em>ref.</em> solo si aún no hay costo congelado. El total en Bs/USD en el pie es <strong>neto</strong> (salidas suman, excedentes restan).</p>
 <?php
 $pl = $pagination['list'];
 $movPerPage = (int)$pl['per'];
