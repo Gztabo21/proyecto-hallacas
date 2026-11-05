@@ -122,67 +122,179 @@ $hideJornadaCol = $paymentsEmbedded;
   </div>
 </div>
 
-<h5 class="mt-2">Historial de pagos</h5>
-<?php if (empty($recientes)): ?>
-<div class="alert alert-secondary">Sin pagos registrados.</div>
-<?php else: ?>
-<div class="table-responsive">
-<table class="table table-striped table-sm">
- <thead><tr><th>Fecha</th><?php if (!$hideJornadaCol): ?><th>Jornada</th><?php endif; ?><th>Misión</th><th>Miembro</th><th>Hallacas</th><th>Monto</th><th>Moneda</th><th>Monto (USD)</th><th>Método</th><th>Referencia</th><th>Estado</th><th>Registrado por</th><th>Confirmado por</th><th>Notas</th><th></th></tr></thead>
- <tbody>
- <?php foreach ($recientes as $p): ?>
- <tr>
-   <td><?= h($p['fecha']) ?></td>
-   <?php if (!$hideJornadaCol): ?><td><?= h($p['jornada_name']) ?></td><?php endif; ?>
-   <td><?= h($p['mission_name']) ?></td>
-   <td><?= h($p['member_name']) ?></td>
-   <td><?= (int)$p['hallacas'] ?></td>
-   <td><?= money($p['monto']) ?></td>
-   <td><?= h($p['moneda']) ?></td>
-   <td class="text-end"><?php
-     $usd = Pago::montoUsd($p);
-     if (($p['moneda'] ?? '') === 'USD') {
-         echo '<strong>' . money($p['monto']) . '</strong>';
-     } elseif ($usd !== null) {
-         echo '<span class="text-muted" title="Estimado con tasa">' . money($usd) . '</span>';
-     } else {
-         echo '—';
-     }
-   ?></td>
-   <td><?= h($p['metodo']) ?></td>
-   <td><?= h($p['referencia'] ?? '—') ?></td>
-   <td><?= status_badge($p['status']) ?></td>
-   <td><?= h($p['creado_por'] ?? '-') ?></td>
-   <td><?= (($p['status'] ?? '') === 'confirmado') ? h($p['confirmado_por_name'] ?? '-') : '-' ?></td>
-   <td><?= h($p['notes']) ?></td>
-   <td class="text-nowrap">
-     <a class="btn btn-sm btn-outline-secondary" href="<?= url('payment_show', ['id' => (int)$p['id']]) ?>">Ver</a>
-     <?php if (PaymentController::canEditPayment($p)): ?>
-     <a class="btn btn-sm btn-outline-primary" href="<?= url('payment_edit', array_filter(['id' => (int)$p['id'], 'jornada_id' => $returnJornadaId ?: null])) ?>">Corregir</a>
-     <?php endif; ?>
-     <?php if (Auth::can('pagos', 'delete') && (($p['status'] ?? '') === 'pendiente' || Auth::isAdmin())): ?>
-     <form method="post" action="<?= url('payment_delete') ?>" class="d-inline" onsubmit="return confirm('¿Eliminar este pago?');">
-       <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
-       <input type="hidden" name="pago_id" value="<?= (int)$p['id'] ?>">
-       <?php if ($returnJornadaId): ?><input type="hidden" name="return_jornada_id" value="<?= (int)$returnJornadaId ?>"><?php endif; ?>
-       <button class="btn btn-sm btn-outline-danger">Eliminar</button>
-     </form>
-     <?php endif; ?>
-   </td>
- </tr>
- <?php endforeach; ?>
- </tbody>
-</table>
+<?php
+$historialFilters = $historialFilters ?? PaymentController::historialFiltersFromRequest();
+$jornadas = $jornadas ?? Jornada::all();
+$missions = $missions ?? Mission::all(true);
+$paymentMembers = $paymentMembers ?? User::all('member');
+$histJ = $historialFilters['jornada_id'] ?? null;
+$histM = $historialFilters['mission_id'] ?? null;
+$histMember = $historialFilters['member_id'] ?? null;
+$histRef = $historialFilters['referencia'] ?? '';
+$historialPagination = [
+    'total' => $pagination['recientes']['total'],
+    'page' => $pagination['recientes']['page'],
+    'per' => $pagination['recientes']['per'],
+    'param' => 'pr',
+    'route' => $paginationRoute,
+    'preserveParams' => $paginationRoute === 'payments' ? ['pf', 'pc', 'pr'] : ['pr'],
+    'filters' => $pagination['recientes']['filters'] ?? [],
+];
+?>
+<div id="paymentHistorialSection" class="mt-2">
+<h5 class="mb-2">Historial de pagos</h5>
+<form id="paymentHistorialFilters" class="card card-body py-2 px-3 mb-2" onsubmit="return false;">
+  <input type="hidden" name="embed_route" value="<?= h($paginationRoute) ?>">
+  <?php if ($returnJornadaId): ?>
+  <input type="hidden" name="id" value="<?= (int)$returnJornadaId ?>">
+  <input type="hidden" name="tab" value="pagos">
+  <?php endif; ?>
+  <div class="row g-2 align-items-end">
+    <div class="col-md-3">
+      <label class="form-label small mb-0">Referencia</label>
+      <input type="search" name="hist_referencia" id="paymentHistReferencia" class="form-control form-control-sm" value="<?= h($histRef) ?>" placeholder="Últimos dígitos o completa" autocomplete="off">
+    </div>
+    <?php if (!$hideJornadaCol): ?>
+    <div class="col-md-2">
+      <label class="form-label small mb-0">Jornada</label>
+      <select name="hist_jornada_id" class="form-select form-select-sm payment-hist-filter">
+        <option value="">Todas</option>
+        <?php foreach ($jornadas as $j): ?>
+        <option value="<?= (int)$j['id'] ?>"<?= (int)$histJ === (int)$j['id'] ? ' selected' : '' ?>><?= h($j['name']) ?></option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+    <?php else: ?>
+    <input type="hidden" name="hist_jornada_id" value="<?= (int)($histJ ?: $returnJornadaId) ?>">
+    <?php endif; ?>
+    <div class="col-md-2">
+      <label class="form-label small mb-0">Misión</label>
+      <select name="hist_mission_id" class="form-select form-select-sm payment-hist-filter"<?= (Auth::isCoordinator() && !Auth::isAdmin()) ? ' disabled' : '' ?>>
+        <option value="">Todas</option>
+        <?php foreach ($missions as $m): ?>
+        <option value="<?= (int)$m['id'] ?>"<?= (int)$histM === (int)$m['id'] ? ' selected' : '' ?>><?= h($m['name']) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <?php if (Auth::isCoordinator() && !Auth::isAdmin()): ?>
+      <input type="hidden" name="hist_mission_id" value="<?= (int)Auth::missionId() ?>">
+      <?php endif; ?>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small mb-0">Miembro</label>
+      <select name="hist_member_id" class="form-select form-select-sm payment-hist-filter">
+        <option value="">Todos</option>
+        <?php foreach ($paymentMembers as $u): ?>
+        <option value="<?= (int)$u['id'] ?>"<?= (int)$histMember === (int)$u['id'] ? ' selected' : '' ?>><?= h($u['name']) ?></option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <button type="button" class="btn btn-sm btn-outline-secondary w-100" id="paymentHistClear">Limpiar</button>
+    </div>
+  </div>
+  <p class="text-muted small mb-0 mt-2">La referencia busca coincidencia exacta o por <strong>últimos dígitos</strong> mientras escribe.</p>
+</form>
+<div id="paymentHistorialContent">
+<?php include BASE_PATH . '/app/views/payments/_historial_content.php'; ?>
 </div>
-<?= pagination_render(
-    $pagination['recientes']['total'],
-    $pagination['recientes']['page'],
-    $pagination['recientes']['per'],
-    $paginationRoute,
-    $pagination['recientes']['param'],
-    array_merge($pagination['filters'], pagination_preserve($pagination['params'], $pagination['recientes']['param']))
-) ?>
-<?php endif; ?>
+</div>
+<script>
+(function () {
+  var section = document.getElementById('paymentHistorialSection');
+  if (!section) return;
+  var form = document.getElementById('paymentHistorialFilters');
+  var content = document.getElementById('paymentHistorialContent');
+  var refInput = document.getElementById('paymentHistReferencia');
+  var debounceTimer = null;
+  var loading = false;
+
+  function buildQuery(page) {
+    var params = new URLSearchParams(new FormData(form));
+    params.set('r', 'payment_historial');
+    if (page && page > 1) {
+      params.set('pr', String(page));
+    } else {
+      params.delete('pr');
+    }
+    return params.toString();
+  }
+
+  function loadHistorial(page) {
+    if (loading) return;
+    loading = true;
+    content.classList.add('opacity-50');
+    fetch(window.location.pathname + '?' + buildQuery(page), {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      credentials: 'same-origin'
+    }).then(function (res) {
+      if (!res.ok) throw new Error('fetch');
+      return res.text();
+    }).then(function (html) {
+      content.innerHTML = html;
+      bindHistorialPagination();
+      syncUrl(page);
+    }).catch(function () {
+      content.innerHTML = '<div class="alert alert-danger mb-0">No se pudo cargar el historial.</div>';
+    }).finally(function () {
+      loading = false;
+      content.classList.remove('opacity-50');
+    });
+  }
+
+  function syncUrl(page) {
+    if (typeof history.replaceState !== 'function') return;
+    var params = new URLSearchParams(window.location.search);
+    ['hist_referencia', 'hist_jornada_id', 'hist_mission_id', 'hist_member_id'].forEach(function (key) {
+      var el = form.querySelector('[name="' + key + '"]');
+      if (!el) return;
+      var v = el.value;
+      if (v) params.set(key, v); else params.delete(key);
+    });
+    if (page && page > 1) params.set('pr', String(page)); else params.delete('pr');
+    history.replaceState(null, '', window.location.pathname + '?' + params.toString());
+  }
+
+  function bindHistorialPagination() {
+    content.querySelectorAll('.pagination a.page-link[href]').forEach(function (a) {
+      if (a.getAttribute('href') === '#') return;
+      a.addEventListener('click', function (ev) {
+        try {
+          var u = new URL(a.href, window.location.origin);
+          var p = parseInt(u.searchParams.get('pr') || '1', 10);
+          ev.preventDefault();
+          loadHistorial(p);
+        } catch (e) { /* follow link */ }
+      });
+    });
+  }
+
+  form.querySelectorAll('.payment-hist-filter').forEach(function (el) {
+    el.addEventListener('change', function () { loadHistorial(1); });
+  });
+
+  if (refInput) {
+    refInput.addEventListener('input', function () {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(function () { loadHistorial(1); }, 320);
+    });
+  }
+
+  var clearBtn = document.getElementById('paymentHistClear');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', function () {
+      if (refInput) refInput.value = '';
+      form.querySelectorAll('.payment-hist-filter').forEach(function (el) { el.value = ''; });
+      var hiddenJ = form.querySelector('input[type="hidden"][name="hist_jornada_id"]');
+      if (hiddenJ && <?= $hideJornadaCol ? 'true' : 'false' ?>) {
+        hiddenJ.value = '<?= (int)($returnJornadaId ?? 0) ?>';
+      }
+      loadHistorial(1);
+    });
+  }
+
+  bindHistorialPagination();
+})();
+</script>
 
 <div class="modal fade" id="payModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">

@@ -1,11 +1,68 @@
 <?php
 class InventoryController {
+    public static function canExportInventoryExcel(): bool {
+        return Auth::isAdmin() || Auth::isPurchaseAdmin() || Auth::isPurchaseCoordinator();
+    }
+
+    private static function requireInventoryExportRole(): void {
+        require_login();
+        if (!self::canExportInventoryExcel()) {
+            http_response_code(403);
+            die('Acceso denegado.');
+        }
+    }
+
     private static function requireInventoryRole(): void {
         require_login();
         if (!Auth::canAccessInventory()) {
             http_response_code(403);
             die('Acceso denegado.');
         }
+    }
+
+    /**
+     * @param list<string> $header
+     * @param list<array<int|string|float|null>> $rows
+     */
+    private static function streamXlsx(string $filename, array $header, array $rows, string $sheetTitle = 'Datos'): void {
+        if (!class_exists(\PhpOffice\PhpSpreadsheet\Spreadsheet::class)) {
+            http_response_code(503);
+            die('Exportación Excel no disponible: ejecute composer install (phpoffice/phpspreadsheet) en el servidor.');
+        }
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle(mb_substr($sheetTitle, 0, 31, 'UTF-8'));
+        foreach ($header as $colIndex => $label) {
+            $col = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIndex + 1);
+            $coord = $col . '1';
+            $sheet->setCellValue($coord, $label);
+            $sheet->getStyle($coord)->getFont()->setBold(true);
+        }
+        $rowNum = 2;
+        foreach ($rows as $row) {
+            foreach ($row as $colIndex => $value) {
+                $col = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIndex + 1);
+                $sheet->setCellValue($col . $rowNum, $value);
+            }
+            $rowNum++;
+        }
+        for ($colIndex = 1, $max = count($header); $colIndex <= $max; $colIndex++) {
+            $col = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIndex);
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->save('php://output');
+        exit;
+    }
+
+    private static function csvDecimal(?float $v, int $decimals = 2): string {
+        if ($v === null) {
+            return '';
+        }
+        return rtrim(rtrim(number_format($v, $decimals, '.', ''), '0'), '.');
     }
 
     private static function requireInventoryCatalogRole(): void {
@@ -274,6 +331,131 @@ class InventoryController {
         include BASE_PATH . '/app/views/inventory/pdf_movements.php';
         $html = ob_get_clean();
         self::streamPdf($html, 'movimientos-inventario-' . date('Y-m-d') . '.pdf');
+    }
+
+    public static function movementsExportExcel(): void {
+        self::requireInventoryExportRole();
+        if (!self::ensureTables()) {
+            return;
+        }
+        $filters = self::movementFiltersFromRequest();
+        $filterArgs = array_filter([
+            'product_id' => $filters['product_id'],
+            'jornada_id' => $filters['jornada_id'],
+            'purchase_id' => $filters['purchase_id'],
+        ], static fn($v) => $v !== null && $v !== '');
+        $total = InventoryMovement::count($filterArgs);
+        $movements = InventoryMovement::all($filterArgs, min(10000, max(1, $total)), 0);
+        $refCostByProduct = InventoryMovement::latestCostByProduct();
+        $header = [
+            'fecha',
+            'tipo',
+            'producto',
+            'sku',
+            'cantidad',
+            'unidad',
+            'precio_unit_bs',
+            'total_bs',
+            'precio_unit_usd',
+            'tasa',
+            'jornada',
+            'registrado_por',
+            'notas',
+        ];
+        $rows = [];
+        $totBs = 0.0;
+        foreach ($movements as $m) {
+            $delta = InventoryMovement::deltaForTipo($m['tipo'], (float)$m['cantidad']);
+            $sign = $delta >= 0 ? '+' : '-';
+            $qtyStr = $sign . self::csvDecimal(abs((float)$m['cantidad']), 3);
+            $price = InventoryMovement::displayUnitPrice($m, $refCostByProduct);
+            $signed = InventoryMovement::signedLineAmounts($m, $refCostByProduct);
+            $totBs += $signed['bs'];
+            $rows[] = [
+                $m['fecha_ingreso'],
+                InventoryMovement::tipoLabelForMovement($m),
+                $m['product_name'],
+                $m['sku'],
+                $qtyStr,
+                $m['unidad_metrica'],
+                $price['precio_bs'] !== null && $price['precio_bs'] > 0 ? self::csvDecimal($price['precio_bs'], 4) : '',
+                $signed['bs'] != 0.0 ? self::csvDecimal($signed['bs'], 2) : '',
+                $price['precio_usd'] !== null && $price['precio_usd'] > 0 ? self::csvDecimal($price['precio_usd'], 4) : '',
+                $price['tasa'] !== null && $price['tasa'] > 0 ? self::csvDecimal($price['tasa'], 4) : '',
+                $m['jornada_name'] ?? '',
+                $m['created_by_name'] ?? '',
+                $m['notes'] ?? '',
+            ];
+        }
+        if ($rows !== []) {
+            $rows[] = ['', '', '', '', '', '', '', self::csvDecimal($totBs, 2), '', '', '', 'TOTAL (Bs neto)', ''];
+        }
+        $fname = 'historial-movimientos-' . date('Y-m-d') . '.xlsx';
+        self::streamXlsx($fname, $header, $rows, 'Historial');
+    }
+
+    public static function jornadaSalidasExportExcel(): void {
+        self::requireInventoryExportRole();
+        if (!self::ensureTables()) {
+            return;
+        }
+        $jid = (int)($_GET['jornada_id'] ?? 0);
+        $jornada = Jornada::find($jid);
+        if (!$jornada) {
+            flash('error', 'Jornada no encontrada');
+            redirect('jornadas');
+            return;
+        }
+        if (!Auth::canAccessInventory()) {
+            http_response_code(403);
+            die('Acceso denegado.');
+        }
+        if (Auth::isJornadaAdmin() && !in_array($jid, Auth::jornadaIds(), true)) {
+            flash('error', 'No autorizado');
+            redirect('jornadas');
+            return;
+        }
+        $movements = InventoryMovement::all(['jornada_id' => $jid, 'tipo' => 'salida_jornada'], 10000, 0);
+        $refCostByProduct = InventoryMovement::latestCostByProduct();
+        $header = [
+            'jornada',
+            'fecha',
+            'producto',
+            'sku',
+            'cantidad',
+            'unidad',
+            'precio_unit_bs',
+            'total_bs',
+            'registrado_por',
+            'notas',
+        ];
+        $rows = [];
+        $totBs = 0.0;
+        foreach ($movements as $m) {
+            $price = InventoryMovement::displayUnitPrice($m, $refCostByProduct);
+            $line = InventoryMovement::lineTotalAmounts($m, $refCostByProduct);
+            if ($line['bs'] > 0) {
+                $totBs += $line['bs'];
+            }
+            $rows[] = [
+                $jornada['name'],
+                $m['fecha_ingreso'],
+                $m['product_name'],
+                $m['sku'],
+                self::csvDecimal((float)$m['cantidad'], 3),
+                $m['unidad_metrica'],
+                $price['precio_bs'] !== null && $price['precio_bs'] > 0 ? self::csvDecimal($price['precio_bs'], 4) : '',
+                $line['bs'] > 0 ? self::csvDecimal($line['bs'], 2) : '',
+                $m['created_by_name'] ?? '',
+                $m['notes'] ?? '',
+            ];
+        }
+        if ($rows !== []) {
+            $rows[] = ['', '', '', '', '', '', '', self::csvDecimal($totBs, 2), 'TOTAL (Bs)', ''];
+        }
+        $safeName = preg_replace('/[^a-zA-Z0-9_-]+/', '-', (string)$jornada['name']) ?: 'jornada';
+        $fname = 'salidas-' . $safeName . '-' . date('Y-m-d') . '.xlsx';
+        self::streamXlsx($fname, $header, $rows, 'Salidas jornada');
     }
 
     public static function productCreate(): void {

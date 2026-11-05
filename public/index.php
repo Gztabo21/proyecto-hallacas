@@ -195,6 +195,9 @@ switch ($route) {
     case 'payments':
         PaymentController::index();
         break;
+    case 'payment_historial':
+        PaymentController::historialFragment();
+        break;
     case 'payment_method_store':
         PaymentController::storeMethod();
         break;
@@ -239,6 +242,12 @@ switch ($route) {
         break;
     case 'inventory_movements_pdf':
         InventoryController::movementsPdf();
+        break;
+    case 'inventory_movements_export':
+        InventoryController::movementsExportExcel();
+        break;
+    case 'inventory_jornada_salidas_export':
+        InventoryController::jornadaSalidasExportExcel();
         break;
     case 'inventory_product_create':
         InventoryController::productCreate();

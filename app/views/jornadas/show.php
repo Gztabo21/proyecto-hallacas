@@ -92,6 +92,9 @@ $jornadaUseTabs = count($jornadaTabLabels) > 1;
 <?php
 $canManageJornadaMissions = Auth::isAdmin()
     || (Auth::isJornadaAdmin() && in_array((int)$jornada['id'], Auth::jornadaIds(), true));
+$canCorrectMissionAssign = Auth::isAdmin()
+    || Auth::isCoordinator()
+    || (Auth::isJornadaAdmin() && in_array((int)$jornada['id'], Auth::jornadaIds(), true));
 ?>
 <div class="d-flex flex-wrap gap-2 mb-3">
 <?php if ($canManageJornadaMissions): ?>
@@ -624,7 +627,7 @@ jQuery(function($){
    <strong><?= h($jm['mission_name']) ?></strong>
    <div class="d-flex flex-wrap align-items-center gap-2">
    <span>Asignadas: <?= $asignadasMission ?> | Entregadas: <?= $entregadasMission ?> | Pagadas: <?= (int)$deliv['p'] ?> | Pendientes: <?= $entregadasMission-(int)$deliv['p'] ?> | Restantes por distribuir: <strong><?= $remaining ?></strong></span>
-   <?php if (Auth::isAdmin() || Auth::isCoordinator()): ?>
+   <?php if ($canCorrectMissionAssign): ?>
    <button type="button" class="btn btn-sm btn-outline-primary btn-correct-mission-assign"
      data-bs-toggle="modal" data-bs-target="#correctMissionAssignModal"
      data-mission-id="<?= $mid ?>"
@@ -799,7 +802,12 @@ include BASE_PATH . '/app/views/payments/_panel.php';
     </form>
     <?php elseif ($jornadaInvSub === 'salidas'): ?>
     <?php $canEditJornadaSalidas = Auth::canManageJornadaInventory((int)$jornada['id']); ?>
-    <p class="text-muted small mb-2">Precio unitario en Bs. <strong>congelado</strong> al registrar la salida (costo vigente en esa fecha). Las compras posteriores no cambian estas líneas.</p>
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+    <p class="text-muted small mb-0">Precio unitario en Bs. <strong>congelado</strong> al registrar la salida (costo vigente en esa fecha). Las compras posteriores no cambian estas líneas.</p>
+    <?php if (InventoryController::canExportInventoryExcel() && $salidasCount > 0): ?>
+    <a class="btn btn-sm btn-outline-success flex-shrink-0" href="<?= url('inventory_jornada_salidas_export', ['jornada_id' => (int)$jornada['id']]) ?>">Exportar Excel</a>
+    <?php endif; ?>
+    </div>
     <?php if ($salidasCount === 0): ?>
     <p class="text-muted mb-0">No hay salidas registradas. Use la pestaña «Entregar ingredientes».</p>
     <?php else: ?>

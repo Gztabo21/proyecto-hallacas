@@ -144,8 +144,12 @@ class JornadaController {
                 $id,
                 $missionFilter,
                 'jornada_show',
-                ['id' => $id, 'tab' => 'pagos']
+                ['id' => $id, 'tab' => 'pagos'],
+                PaymentController::historialFiltersFromRequest()
             );
+            $paymentsPanel['jornadas'] = Jornada::all();
+            $paymentsPanel['missions'] = Mission::all(true);
+            $paymentsPanel['paymentMembers'] = User::all('member');
         }
         $jornadaTabProduccion = Auth::isAdmin()
             || (Auth::isJornadaAdmin() && in_array($id, Auth::jornadaIds(), true));
@@ -295,14 +299,19 @@ class JornadaController {
         redirect('jornada_show', ['id'=>$jid]);
     }
     public static function corregirAsignacion(): void {
-        require_role('admin', 'coordinator');
+        require_role('admin', 'coordinator', 'jornada_admin');
         if (!csrf_verify()) {
             flash('error', 'CSRF inválido');
             redirect('jornadas');
         }
         $jid = (int)($_POST['jornada_id'] ?? 0);
         $mid = (int)($_POST['mission_id'] ?? 0);
-        if (!Auth::isAdmin() && Auth::missionId() !== $mid) {
+        if (Auth::isJornadaAdmin() && !in_array($jid, Auth::jornadaIds(), true)) {
+            flash('error', 'No autorizado para esta jornada');
+            redirect('jornadas');
+            return;
+        }
+        if (!Auth::isAdmin() && !Auth::isJornadaAdmin() && Auth::missionId() !== $mid) {
             flash('error', 'No autorizado');
             redirect('jornada_show', ['id' => $jid]);
             return;

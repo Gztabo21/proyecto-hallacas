@@ -17,6 +17,16 @@ $jornadas = $jornadas ?? [];
     <a class="btn btn-outline-secondary btn-sm" href="<?= url('inventory_purchases') ?>">Compras y donaciones</a>
     <?php endif; ?>
     <a class="btn btn-outline-danger btn-sm" href="<?= url('inventory_movements_pdf', $pdfParams) ?>">Descargar PDF</a>
+    <?php if (InventoryController::canExportInventoryExcel()): ?>
+    <?php
+    $excelParams = array_filter([
+        'product_id' => isset($_GET['product_id']) && $_GET['product_id'] !== '' ? (int)$_GET['product_id'] : null,
+        'jornada_id' => isset($_GET['jornada_id']) && $_GET['jornada_id'] !== '' ? (int)$_GET['jornada_id'] : null,
+        'purchase_id' => isset($_GET['purchase_id']) && $_GET['purchase_id'] !== '' ? (int)$_GET['purchase_id'] : null,
+    ], fn($v) => $v !== null);
+    ?>
+    <a class="btn btn-outline-success btn-sm" href="<?= url('inventory_movements_export', $excelParams) ?>">Exportar Excel</a>
+    <?php endif; ?>
   </div>
 </div>
 <?php if (!empty($_GET['purchase_id'])): ?>

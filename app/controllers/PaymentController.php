@@ -7,13 +7,146 @@ class PaymentController {
         return Auth::isAdmin() || Auth::can('pagos', 'create') || Auth::can('pagos', 'edit');
     }
 
+    /** @return array{jornada_id:?int,mission_id:?int,member_id:?int,referencia:string} */
+    public static function historialFiltersFromRequest(): array {
+        return [
+            'jornada_id' => isset($_GET['hist_jornada_id']) && $_GET['hist_jornada_id'] !== ''
+                ? (int)$_GET['hist_jornada_id'] : null,
+            'mission_id' => isset($_GET['hist_mission_id']) && $_GET['hist_mission_id'] !== ''
+                ? (int)$_GET['hist_mission_id'] : null,
+            'member_id' => isset($_GET['hist_member_id']) && $_GET['hist_member_id'] !== ''
+                ? (int)$_GET['hist_member_id'] : null,
+            'referencia' => trim((string)($_GET['hist_referencia'] ?? '')),
+        ];
+    }
+
+    /**
+     * @param array{jornada_id:?int,mission_id:?int,member_id:?int,referencia:string} $historialFilters
+     * @return array{0:string,1:array<int,mixed>}
+     */
+    private static function historialWhereSql(array $historialFilters): array {
+        $w = 'WHERE 1=1';
+        $p = [];
+        if (!empty($historialFilters['jornada_id'])) {
+            $w .= ' AND e.jornada_id = ?';
+            $p[] = (int)$historialFilters['jornada_id'];
+        }
+        if (!empty($historialFilters['mission_id'])) {
+            $w .= ' AND e.mission_id = ?';
+            $p[] = (int)$historialFilters['mission_id'];
+        }
+        if (!empty($historialFilters['member_id'])) {
+            $w .= ' AND e.member_id = ?';
+            $p[] = (int)$historialFilters['member_id'];
+        }
+        $ref = trim((string)($historialFilters['referencia'] ?? ''));
+        if ($ref !== '') {
+            $w .= ' AND (p.referencia = ? OR p.referencia LIKE ?)';
+            $p[] = $ref;
+            $p[] = '%' . $ref;
+        }
+        if (Auth::isCoordinator() && !Auth::isAdmin()) {
+            $w .= ' AND e.mission_id = ?';
+            $p[] = Auth::missionId();
+        }
+        return [$w, $p];
+    }
+
+    /**
+     * @param array{jornada_id:?int,mission_id:?int,member_id:?int,referencia:string} $historialFilters
+     * @return array{recientes:array<int,array<string,mixed>>,total:int,page:int,per:int}
+     */
+    public static function fetchHistorialPagos(
+        array $historialFilters,
+        int $page,
+        int $per = 10
+    ): array {
+        [$w2, $p2] = self::historialWhereSql($historialFilters);
+        $page = max(1, $page);
+        $total = (int)DB::query(
+            "SELECT COUNT(*) c FROM pagos p JOIN entregas e ON e.id=p.entrega_id $w2",
+            $p2
+        )->fetch()['c'];
+        $recientes = DB::query(
+            "SELECT p.*, e.id AS entrega_id, e.mission_id, e.jornada_id, u.name AS member_name, m.name AS mission_name, j.name AS jornada_name, uc.name AS creado_por, ucf.name AS confirmado_por_name
+             FROM pagos p
+             JOIN entregas e ON e.id=p.entrega_id
+             JOIN users u ON u.id=e.member_id
+             JOIN missions m ON m.id=e.mission_id
+             JOIN jornadas j ON j.id=e.jornada_id
+             LEFT JOIN users uc ON uc.id=p.created_by
+             LEFT JOIN users ucf ON ucf.id=p.confirmado_por
+             $w2
+             ORDER BY p.fecha DESC
+             LIMIT " . (int)$per . ' OFFSET ' . (int)(($page - 1) * $per),
+            $p2
+        )->fetchAll();
+        return ['recientes' => $recientes, 'total' => $total, 'page' => $page, 'per' => $per];
+    }
+
+    public static function historialFragment(): void {
+        require_login();
+        if (!self::canAccessPaymentsModule()) {
+            http_response_code(403);
+            echo 'Acceso denegado.';
+            return;
+        }
+        $historialFilters = self::historialFiltersFromRequest();
+        $page = pagination_page('pr');
+        $paginationRoute = (string)($_GET['embed_route'] ?? 'payments');
+        if ($paginationRoute !== 'jornada_show') {
+            $paginationRoute = 'payments';
+        }
+        $paginationExtra = [];
+        if ($paginationRoute === 'jornada_show') {
+            $jid = (int)($_GET['id'] ?? 0);
+            if ($jid > 0) {
+                $paginationExtra = ['id' => $jid, 'tab' => 'pagos'];
+                if (empty($historialFilters['jornada_id'])) {
+                    $historialFilters['jornada_id'] = $jid;
+                }
+            }
+        }
+        $hist = self::fetchHistorialPagos($historialFilters, $page);
+        $recientes = $hist['recientes'];
+        $historialPagination = [
+            'total' => $hist['total'],
+            'page' => $hist['page'],
+            'per' => $hist['per'],
+            'param' => 'pr',
+            'route' => $paginationRoute,
+            'preserveParams' => $paginationRoute === 'payments' ? ['pf', 'pc', 'pr'] : ['pr'],
+            'filters' => array_merge(
+                $paginationExtra,
+                pagination_query_preserve([
+                    'hist_jornada_id' => $historialFilters['jornada_id'],
+                    'hist_mission_id' => $historialFilters['mission_id'],
+                    'hist_member_id' => $historialFilters['member_id'],
+                    'hist_referencia' => $historialFilters['referencia'] !== '' ? $historialFilters['referencia'] : null,
+                ])
+            ),
+        ];
+        $paymentsEmbedded = $paginationRoute === 'jornada_show';
+        $returnJornadaId = $paymentsEmbedded ? (int)($paginationExtra['id'] ?? 0) : null;
+        $hideJornadaCol = $paymentsEmbedded;
+        include BASE_PATH . '/app/views/payments/_historial_content.php';
+    }
+
     /** @return array<string,mixed> */
     public static function indexData(
         ?int $jornadaId,
         ?int $missionId,
         string $paginationRoute = 'payments',
-        array $paginationExtra = []
+        array $paginationExtra = [],
+        ?array $historialFilters = null
     ): array {
+        $historialFilters ??= self::historialFiltersFromRequest();
+        if ($paginationRoute === 'jornada_show' && empty($historialFilters['jornada_id'])) {
+            $embedJid = (int)($paginationExtra['id'] ?? 0);
+            if ($embedJid > 0) {
+                $historialFilters['jornada_id'] = $embedJid;
+            }
+        }
         $where = 'WHERE (e.hallacas_entregadas - e.hallacas_pagadas) > 0';
         $params = [];
         if ($jornadaId) {
@@ -84,38 +217,8 @@ class PaymentController {
             $paramsP
         )->fetchAll();
 
-        $w2 = 'WHERE 1=1';
-        $p2 = [];
-        if ($jornadaId) {
-            $w2 .= ' AND e.jornada_id = ?';
-            $p2[] = $jornadaId;
-        }
-        if ($missionId) {
-            $w2 .= ' AND e.mission_id = ?';
-            $p2[] = $missionId;
-        }
-        if (Auth::isCoordinator() && !Auth::isAdmin()) {
-            $w2 .= ' AND e.mission_id = ?';
-            $p2[] = Auth::missionId();
-        }
-        $totalRecientes = (int)DB::query(
-            "SELECT COUNT(*) c FROM pagos p JOIN entregas e ON e.id=p.entrega_id $w2",
-            $p2
-        )->fetch()['c'];
-        $recientes = DB::query(
-            "SELECT p.*, e.id AS entrega_id, e.mission_id, e.jornada_id, u.name AS member_name, m.name AS mission_name, j.name AS jornada_name, uc.name AS creado_por, ucf.name AS confirmado_por_name
-             FROM pagos p
-             JOIN entregas e ON e.id=p.entrega_id
-             JOIN users u ON u.id=e.member_id
-             JOIN missions m ON m.id=e.mission_id
-             JOIN jornadas j ON j.id=e.jornada_id
-             LEFT JOIN users uc ON uc.id=p.created_by
-             LEFT JOIN users ucf ON ucf.id=p.confirmado_por
-             $w2
-             ORDER BY p.fecha DESC
-             LIMIT " . (int)$perRecientes . ' OFFSET ' . (int)(($pageRecientes - 1) * $perRecientes),
-            $p2
-        )->fetchAll();
+        $hist = self::fetchHistorialPagos($historialFilters, $pageRecientes, $perRecientes);
+        $recientes = $hist['recientes'];
 
         $filterPreserve = array_merge(
             pagination_query_preserve([
@@ -124,16 +227,31 @@ class PaymentController {
             ]),
             $paginationExtra
         );
+        $historialFilterPreserve = array_merge(
+            $paginationExtra,
+            pagination_query_preserve([
+                'hist_jornada_id' => $historialFilters['jornada_id'],
+                'hist_mission_id' => $historialFilters['mission_id'],
+                'hist_member_id' => $historialFilters['member_id'],
+                'hist_referencia' => $historialFilters['referencia'] !== '' ? $historialFilters['referencia'] : null,
+            ])
+        );
         $pagination = [
             'confirmar' => ['total' => $totalPagosPendientes, 'page' => $pageConfirmar, 'per' => $perConfirmar, 'param' => 'pf'],
             'cancelar' => ['total' => $totalPendientes, 'page' => $pageCancelar, 'per' => $perCancelar, 'param' => 'pc'],
-            'recientes' => ['total' => $totalRecientes, 'page' => $pageRecientes, 'per' => $perRecientes, 'param' => 'pr'],
+            'recientes' => [
+                'total' => $hist['total'],
+                'page' => $hist['page'],
+                'per' => $hist['per'],
+                'param' => 'pr',
+                'filters' => $historialFilterPreserve,
+            ],
             'params' => ['pf', 'pc', 'pr'],
             'filters' => $filterPreserve,
             'route' => $paginationRoute,
         ];
 
-        return compact('pendientes', 'pagosPendientes', 'recientes', 'pagination');
+        return compact('pendientes', 'pagosPendientes', 'recientes', 'pagination', 'historialFilters');
     }
 
     public static function redirectToList(): void {
@@ -158,6 +276,7 @@ class PaymentController {
         $returnJornadaId = null;
         $jornadas = Jornada::all();
         $missions = Mission::all(true);
+        $paymentMembers = User::all('member');
         include BASE_PATH . '/app/views/payments/index.php';
     }
 
