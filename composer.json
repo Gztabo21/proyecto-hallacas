@@ -5,6 +5,9 @@
     "phpoffice/phpspreadsheet": "^3.10"
   },
   "config": {
-    "optimize-autoloader": true
+    "optimize-autoloader": true,
+    "platform": {
+      "php": "8.2.35"
+    }
   }
 }
